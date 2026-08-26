@@ -270,7 +270,7 @@ class MainActivity : ThemedActivity(),
             }
             .setNeutralButton(android.R.string.cancel, null)
             .setNeutralButton(R.string.action_learn_more) { _, _ ->
-                launchCustomTab("https://matsuridayo.github.io/nb4a-plugin/")
+                launchCustomTab("https://github.com/cwash797-cmd/RX-PRO")
             }
             .show()
     }
@@ -341,7 +341,7 @@ class MainActivity : ThemedActivity(),
             R.id.nav_tools -> displayFragment(ToolsFragment())
             R.id.nav_logcat -> displayFragment(LogcatFragment())
             R.id.nav_faq -> {
-                launchCustomTab("https://matsuridayo.github.io/")
+                launchCustomTab("https://t.me/russian_paradice_vpn")
                 return false
             }
 

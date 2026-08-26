@@ -83,7 +83,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .subText(SagerNet.appVersionNameForDisplay)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://github.com/MatsuriDayo/NekoBoxForAndroid/releases"
+                                        "https://github.com/cwash797-cmd/RX-PRO/releases"
                                     )
                                 }
                                 .build())
@@ -115,7 +115,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .subText(R.string.donate_info)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://matsuridayo.github.io/index_docs/#donate"
+                                        "https://app.lava.top/2107724612?tabId=donate"
                                     )
                                 }
                                 .build())
@@ -183,7 +183,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .text(R.string.github)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://github.com/MatsuriDayo/NekoBoxForAndroid"
+                                        "https://github.com/cwash797-cmd/RX-PRO"
 
                                     )
                                 }
@@ -194,7 +194,7 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .text(R.string.telegram)
                                 .setOnClickAction {
                                     requireContext().launchCustomTab(
-                                        "https://t.me/MatsuriDayo"
+                                        "https://t.me/russian_paradice_vpn"
                                     )
                                 }
                                 .build())
@@ -220,9 +220,9 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                     }
                     val response = client.newRequest().apply {
                         if (checkPreview) {
-                            setURL("https://api.github.com/repos/MatsuriDayo/NekoBoxForAndroid/releases/tags/preview")
+                            setURL("https://api.github.com/repos/cwash797-cmd/RX-PRO/releases/tags/preview")
                         } else {
-                            setURL("https://api.github.com/repos/MatsuriDayo/NekoBoxForAndroid/releases/latest")
+                            setURL("https://api.github.com/repos/cwash797-cmd/RX-PRO/releases/latest")
                         }
                     }.execute()
                     val release = JSONObject(Util.getStringBox(response.contentString))
