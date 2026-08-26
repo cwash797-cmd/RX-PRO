@@ -76,6 +76,8 @@ object PluginManager {
             // RX-PRO: bundled plugins (no external APK needed)
             "mieru-plugin" -> soIfExist("libmieru.so")
             "naive-plugin" -> soIfExist("libnaive.so")
+            // RX-PRO: Xray-core, the only core implementing XHTTP transport
+            "xray-plugin" -> soIfExist("libxray.so")
             else -> null
         }
     }

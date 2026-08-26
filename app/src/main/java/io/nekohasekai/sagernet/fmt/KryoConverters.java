@@ -25,6 +25,7 @@ import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean;
 import io.nekohasekai.sagernet.fmt.tuic.TuicBean;
 import io.nekohasekai.sagernet.fmt.v2ray.VMessBean;
 import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean;
+import io.nekohasekai.sagernet.fmt.xhttp.XhttpBean;
 import io.nekohasekai.sagernet.ktx.KryosKt;
 import io.nekohasekai.sagernet.ktx.Logs;
 import moe.matsuri.nb4a.proxy.config.ConfigBean;
@@ -149,6 +150,12 @@ public class KryoConverters {
         return deserialize(new AnyTLSBean(), bytes);
     }
 
+
+    @TypeConverter
+    public static XhttpBean xhttpDeserialize(byte[] bytes) {
+        if (JavaUtil.isEmpty(bytes)) return null;
+        return deserialize(new XhttpBean(), bytes);
+    }
 
     @TypeConverter
     public static ChainBean chainDeserialize(byte[] bytes) {

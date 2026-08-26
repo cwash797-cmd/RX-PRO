@@ -194,6 +194,9 @@
             android:name="moe.matsuri.nb4a.proxy.anytls.AnyTLSSettingsActivity"
             android:configChanges="uiMode" />
         <activity
+            android:name="io.nekohasekai.sagernet.ui.profile.XhttpSettingsActivity"
+            android:configChanges="uiMode" />
+        <activity
             android:name="moe.matsuri.nb4a.proxy.config.ConfigSettingActivity"
             android:configChanges="uiMode" />
         <activity

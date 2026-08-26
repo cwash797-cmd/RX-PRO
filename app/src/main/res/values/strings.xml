@@ -219,6 +219,7 @@
     <string name="action_mieru" translatable="false">Mieru</string>
     <string name="action_naive" translatable="false">Naïve</string>
     <string name="action_anytls" translatable="false">AnyTLS</string>
+    <string name="action_xhttp" translatable="false">VLESS XHTTP</string>
     <string name="action_hysteria" translatable="false">Hysteria</string>
     <string name="action_ssh" translatable="false">SSH</string>
     <string name="action_wireguard" translatable="false">WireGuard</string>
@@ -466,6 +467,12 @@
         passed out based on the IPv6 strategy (conflicts with FakeDNS)</string>
     <string name="pcap" translatable="false">Pcap</string>
     <string name="pcap_notice">Pcap files will be saved to %s</string>
+    <string name="xhttp_transport_cat" translatable="false">XHTTP</string>
+    <string name="xhttp_mode" translatable="false">XHTTP Mode</string>
+    <string name="xhttp_path" translatable="false">XHTTP Path</string>
+    <string name="xhttp_host" translatable="false">XHTTP Host</string>
+    <string name="xhttp_extra" translatable="false">XHTTP Extra (JSON)</string>
+    <string name="xhttp_extra_summary">Raw "extra" JSON object from the share link (padding / xmux tuning), passed to Xray as-is.</string>
     <string name="naive_insecure_concurrency">Insecure Concurrency</string>
     <string name="naive_insecure_concurrency_summary">Use N concurrent tunnel connections to be more
         robust under bad network conditions. More connections make the tunneling easier to detect

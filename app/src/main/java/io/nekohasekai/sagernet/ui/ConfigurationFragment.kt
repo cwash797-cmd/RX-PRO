@@ -90,6 +90,7 @@ import io.nekohasekai.sagernet.ui.profile.TrojanSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.TuicSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.VMessSettingsActivity
 import io.nekohasekai.sagernet.ui.profile.WireGuardSettingsActivity
+import io.nekohasekai.sagernet.ui.profile.XhttpSettingsActivity
 import io.nekohasekai.sagernet.widget.QRCodeDialog
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -395,6 +396,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 startActivity(Intent(requireActivity(), VMessSettingsActivity::class.java).apply {
                     putExtra("vless", true)
                 })
+            }
+
+            R.id.action_new_xhttp -> {
+                startActivity(Intent(requireActivity(), XhttpSettingsActivity::class.java))
             }
 
             R.id.action_new_trojan -> {

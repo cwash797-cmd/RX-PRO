@@ -9,6 +9,7 @@ import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1Json
 import io.nekohasekai.sagernet.fmt.mieru.MieruBean
 import io.nekohasekai.sagernet.fmt.naive.NaiveBean
+import io.nekohasekai.sagernet.fmt.xhttp.XhttpBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
@@ -750,6 +751,55 @@ object RawUpdater : GroupUpdater() {
         return beans
     }
 
+    // RX-PRO: convert a VLESS outbound that uses the XHTTP transport into an XhttpBean.
+    // Supports both sing-box style ("transport": {"type": "xhttp", ...}) and Xray style
+    // ("streamSettings": {"network": "xhttp", "xhttpSettings": {...}}).
+    private fun JSONObject.parseXhttpOutbound(): XhttpBean? {
+        val stream = optJSONObject("streamSettings")
+        val transport = optJSONObject("transport")
+
+        val network = stream?.getStr("network") ?: transport?.getStr("type")
+        if (network != "xhttp" && network != "splithttp") return null
+
+        val xhttpSettings = stream?.optJSONObject("xhttpSettings")
+            ?: stream?.optJSONObject("splithttpSettings")
+            ?: transport
+
+        // Xray style outbound target lives in settings.vnext[0]
+        val vnext = optJSONObject("settings")?.optJSONArray("vnext")?.optJSONObject(0)
+        val vnextUser = vnext?.optJSONArray("users")?.optJSONObject(0)
+
+        val tlsObj = stream?.optJSONObject("tlsSettings") ?: optJSONObject("tls")
+
+        return XhttpBean().apply {
+            serverAddress = vnext?.getStr("address") ?: getStr("server")
+            serverPort = vnext?.getIntNya("port") ?: getIntNya("server_port") ?: 443
+            uuid = vnextUser?.getStr("id") ?: getStr("uuid") ?: ""
+            xhttpSettings?.getStr("mode")?.let { mode = it }
+            xhttpSettings?.getStr("path")?.let { path = it }
+            xhttpSettings?.getStr("host")?.let { host = it }
+            xhttpSettings?.optJSONObject("extra")?.let { extraJson = it.toString() }
+            security = when {
+                stream?.getStr("security") == "tls" -> "tls"
+                tlsObj?.optBoolean("enabled", false) == true -> "tls"
+                tlsObj != null -> "tls"
+                else -> "none"
+            }
+            tlsObj?.let { tls ->
+                (tls.getStr("serverName") ?: tls.getStr("server_name"))?.let { sni = it }
+                (tls.optBoolean("allowInsecure", false) || tls.optBoolean("insecure", false))
+                    .let { allowInsecure = it }
+                tls.optJSONArray("alpn")?.let { arr ->
+                    alpn = (0 until arr.length()).joinToString(",") { i -> arr.optString(i) }
+                }
+                (tls.getStr("fingerprint")
+                    ?: tls.optJSONObject("utls")?.getStr("fingerprint"))?.let { fingerprint = it }
+            }
+            name = getStr("tag")
+            initializeDefaultValues()
+        }
+    }
+
     fun parseJSON(json: Any): List<AbstractBean> {
         val proxies = ArrayList<AbstractBean>()
 
@@ -793,6 +843,16 @@ object RawUpdater : GroupUpdater() {
                                     name = it.getStr("tag")
                                     initializeDefaultValues()
                                 }
+
+                                // RX-PRO: sing-box has no XHTTP transport either — VLESS
+                                // profiles using it run on the bundled Xray-core binary.
+                                "vless" -> it.parseXhttpOutbound()
+                                    ?: ConfigBean().apply {
+                                        applyDefaultValues()
+                                        type = 1
+                                        config = it.toStringPretty()
+                                        name = it.getStr("tag")
+                                    }
 
                                 "mieru" -> MieruBean().apply {
                                     serverAddress = it.getStr("server")

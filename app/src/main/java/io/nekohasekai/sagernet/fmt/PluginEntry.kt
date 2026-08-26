@@ -34,6 +34,16 @@ enum class PluginEntry(
             downloadLink = "https://github.com/MatsuriDayo/plugins/releases?q=naive"
         )
     ),
+    Xray(
+        "xray-plugin",
+        SagerNet.application.getString(R.string.action_xhttp),
+        "com.rixxx.rxpro.plugin.xray",
+        DownloadSource(
+            playStore = false,
+            fdroid = false,
+            downloadLink = "https://github.com/XTLS/Xray-core/releases"
+        )
+    ),
     Hysteria(
         "hysteria-plugin",
         SagerNet.application.getString(R.string.action_hysteria),

@@ -337,6 +337,18 @@
         <item>UDP</item>
     </string-array>
 
+    <string-array name="xhttp_mode_value" translatable="false">
+        <item>auto</item>
+        <item>packet-up</item>
+        <item>stream-up</item>
+        <item>stream-one</item>
+    </string-array>
+
+    <string-array name="xhttp_security_value" translatable="false">
+        <item>tls</item>
+        <item>none</item>
+    </string-array>
+
     <string-array name="naive_proto_entry">
         <item>HTTPS</item>
         <item>QUIC</item>

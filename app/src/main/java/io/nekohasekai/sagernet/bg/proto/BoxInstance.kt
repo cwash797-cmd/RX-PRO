@@ -16,6 +16,8 @@ import io.nekohasekai.sagernet.fmt.naive.NaiveBean
 import io.nekohasekai.sagernet.fmt.naive.buildNaiveConfig
 import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean
 import io.nekohasekai.sagernet.fmt.trojan_go.buildTrojanGoConfig
+import io.nekohasekai.sagernet.fmt.xhttp.XhttpBean
+import io.nekohasekai.sagernet.fmt.xhttp.buildXrayConfig
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.plugin.PluginManager
 import kotlinx.coroutines.*
@@ -70,6 +72,11 @@ abstract class BoxInstance(
                     is NaiveBean -> {
                         initPlugin("naive-plugin")
                         pluginConfigs[port] = profile.type to bean.buildNaiveConfig(port)
+                    }
+
+                    is XhttpBean -> {
+                        initPlugin("xray-plugin")
+                        pluginConfigs[port] = profile.type to bean.buildXrayConfig(port)
                     }
 
                     is HysteriaBean -> {
@@ -165,6 +172,26 @@ abstract class BoxInstance(
 
                         val commands = mutableListOf(
                             initPlugin("naive-plugin").path, configFile.absolutePath
+                        )
+
+                        processes.start(commands, envMap)
+                    }
+
+                    bean is XhttpBean -> {
+                        val configFile = File(
+                            cacheDir, "xray_" + SystemClock.elapsedRealtime() + ".json"
+                        )
+
+                        configFile.parentFile?.mkdirs()
+                        configFile.writeText(config)
+                        cacheFiles.add(configFile)
+
+                        val envMap = mutableMapOf<String, String>()
+                        // Xray reads its config from this env var when run with "run"
+                        envMap["XRAY_LOCATION_ASSET"] = SagerNet.application.noBackupFilesDir.absolutePath
+
+                        val commands = mutableListOf(
+                            initPlugin("xray-plugin").path, "run", "-c", configFile.absolutePath
                         )
 
                         processes.start(commands, envMap)

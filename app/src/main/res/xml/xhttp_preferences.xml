@@ -1,0 +1,86 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <EditTextPreference
+        app:icon="@drawable/ic_social_emoji_symbols"
+        app:key="name"
+        app:title="@string/profile_name"
+        app:useSimpleSummaryProvider="true" />
+
+    <PreferenceCategory app:title="@string/proxy_cat">
+        <EditTextPreference
+            app:icon="@drawable/ic_hardware_router"
+            app:key="serverAddress"
+            app:title="@string/server_address"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_maps_directions_boat"
+            app:key="serverPort"
+            app:title="@string/server_port"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_vpn_key_24"
+            app:key="uuid"
+            app:title="@string/uuid"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/xhttp_transport_cat">
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="auto"
+            app:entries="@array/xhttp_mode_value"
+            app:entryValues="@array/xhttp_mode_value"
+            app:icon="@drawable/ic_baseline_compare_arrows_24"
+            app:key="mode"
+            app:title="@string/xhttp_mode"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_image_edit"
+            app:key="path"
+            app:title="@string/xhttp_path"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_hardware_router"
+            app:key="host"
+            app:title="@string/xhttp_host"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_action_settings"
+            app:key="extraJson"
+            app:summary="@string/xhttp_extra_summary"
+            app:title="@string/xhttp_extra" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/security_settings">
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue="tls"
+            app:entries="@array/xhttp_security_value"
+            app:entryValues="@array/xhttp_security_value"
+            app:icon="@drawable/ic_notification_enhanced_encryption"
+            app:key="security"
+            app:title="@string/security"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_action_copyright"
+            app:key="sni"
+            app:title="@string/sni"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_legend_toggle_24"
+            app:key="alpn"
+            app:title="@string/alpn"
+            app:useSimpleSummaryProvider="true" />
+        <moe.matsuri.nb4a.ui.SimpleMenuPreference
+            app:defaultValue=""
+            app:entries="@array/utls_fingerprint_entry"
+            app:entryValues="@array/utls_fingerprint_entry"
+            app:icon="@drawable/ic_baseline_fingerprint_24"
+            app:key="fingerprint"
+            app:title="@string/utls_fingerprint"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreference
+            app:icon="@drawable/ic_notification_enhanced_encryption"
+            app:key="allowInsecure"
+            app:title="@string/allow_insecure" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

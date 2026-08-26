@@ -15,6 +15,7 @@ import io.nekohasekai.sagernet.fmt.trojan.parseTrojan
 import io.nekohasekai.sagernet.fmt.tuic.parseTuic
 import io.nekohasekai.sagernet.fmt.trojan_go.parseTrojanGo
 import io.nekohasekai.sagernet.fmt.v2ray.parseV2Ray
+import io.nekohasekai.sagernet.fmt.xhttp.parseXhttp
 import moe.matsuri.nb4a.proxy.anytls.parseAnytls
 import moe.matsuri.nb4a.utils.JavaUtil.gson
 import moe.matsuri.nb4a.utils.Util
@@ -181,11 +182,22 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
                 Logs.w(it)
             }
         } else if (startsWith("vless://")) {
-            Logs.d("Try parse vless link: $this")
-            runCatching {
-                entities.add(parseV2Ray(this))
-            }.onFailure {
-                Logs.w(it)
+            // RX-PRO: sing-box has no XHTTP transport — VLESS XHTTP links become
+            // native Xray-core backed profiles instead of broken sing-box outbounds.
+            if (isXhttpLink(this)) {
+                Logs.d("Try parse vless xhttp link: $this")
+                runCatching {
+                    entities.add(parseXhttp(this))
+                }.onFailure {
+                    Logs.w(it)
+                }
+            } else {
+                Logs.d("Try parse vless link: $this")
+                runCatching {
+                    entities.add(parseV2Ray(this))
+                }.onFailure {
+                    Logs.w(it)
+                }
             }
         } else if (startsWith("trojan://")) {
             Logs.d("Try parse trojan link: $this")
@@ -263,6 +275,16 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
         }
     }
     return if (entities.size > entitiesByLine.size) entities else entitiesByLine
+}
+
+// RX-PRO: detect "type=xhttp" (also accepts the legacy "splithttp" alias) in a share link
+fun isXhttpLink(link: String): Boolean {
+    val query = link.substringAfter('?', "").substringBefore('#')
+    if (query.isBlank()) return false
+    return query.split('&').any {
+        val v = it.substringAfter('=', "").lowercase()
+        it.substringBefore('=').equals("type", true) && (v == "xhttp" || v == "splithttp")
+    }
 }
 
 fun <T : Serializable> T.applyDefaultValues(): T {
