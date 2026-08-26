@@ -6,6 +6,7 @@ import io.nekohasekai.sagernet.fmt.Serializable
 import io.nekohasekai.sagernet.fmt.http.parseHttp
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria2
+import io.nekohasekai.sagernet.fmt.mieru.parseMieru
 import io.nekohasekai.sagernet.fmt.naive.parseNaive
 import io.nekohasekai.sagernet.fmt.parseUniversal
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
@@ -129,6 +130,31 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             Logs.d("Try parse socks link: $this")
             runCatching {
                 entities.add(parseSOCKS(this))
+            }.onFailure {
+                Logs.w(it)
+            }
+        } else if (startsWith("mierus://") || startsWith("mieru://")) {
+            // RX-PRO: mieru official share link scheme (RIXXX panel)
+            Logs.d("Try parse mieru link: $this")
+            runCatching {
+                entities.add(parseMieru(this))
+            }.onFailure {
+                Logs.w(it)
+            }
+        } else if (matches("https://[A-Za-z0-9+/=_-]{16,}(\\?.*)?".toRegex()) && runCatching {
+                substringAfter("://").substringBefore("?").substringBefore("/")
+                    .decodeBase64UrlSafe().matches(".+:.+@.+:\\d+".toRegex())
+            }.getOrDefault(false)) {
+            // RX-PRO: Shadowrocket-style HTTPS proxy link = NaiveProxy (RIXXX panel)
+            // https://BASE64(user:pass@host:port)?remarks=name
+            Logs.d("Try parse shadowrocket naive link: $this")
+            runCatching {
+                val decoded = substringAfter("://").substringBefore("?").substringBefore("/")
+                    .decodeBase64UrlSafe()
+                val remarks = substringAfter("remarks=", "").substringBefore("&")
+                entities.add(parseNaive("naive+https://$decoded").apply {
+                    if (remarks.isNotBlank()) name = remarks.unUrlSafe()
+                })
             }.onFailure {
                 Logs.w(it)
             }

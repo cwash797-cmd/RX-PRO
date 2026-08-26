@@ -19,8 +19,29 @@
 package io.nekohasekai.sagernet.fmt.mieru
 
 import io.nekohasekai.sagernet.ktx.toStringPretty
+import io.nekohasekai.sagernet.ktx.unUrlSafe
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
+
+// RX-PRO: parse mierus:// share links (mieru official URI scheme, used by RIXXX panel)
+// Format: mierus://username:password@host?profile=default&port=2012&protocol=TCP&multiplexing=...#name
+fun parseMieru(link: String): MieruBean {
+    val url = ("https://" + link.substringAfter("://")).toHttpUrlOrNull()
+        ?: error("Invalid mieru link: $link")
+    return MieruBean().apply {
+        serverAddress = url.host
+        // port comes as a query parameter, not in the authority
+        serverPort = url.queryParameter("port")?.toIntOrNull()
+            ?: if (url.port != 443) url.port else 2012
+        username = url.username
+        password = url.password
+        protocol = url.queryParameter("protocol")?.uppercase() ?: "TCP"
+        url.queryParameter("mtu")?.toIntOrNull()?.let { mtu = it }
+        name = url.fragment?.unUrlSafe() ?: ""
+        initializeDefaultValues()
+    }
+}
 
 fun MieruBean.buildMieruConfig(port: Int): String {
     val serverInfo = JSONArray().apply {
