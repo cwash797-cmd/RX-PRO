@@ -73,6 +73,9 @@ object PluginManager {
         return when (pluginId) {
             "hysteria-plugin" -> soIfExist("libhysteria.so")
             "hysteria2-plugin" -> soIfExist("libhysteria2.so")
+            // RX-PRO: bundled plugins (no external APK needed)
+            "mieru-plugin" -> soIfExist("libmieru.so")
+            "naive-plugin" -> soIfExist("libnaive.so")
             else -> null
         }
     }
