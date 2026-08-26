@@ -7,6 +7,8 @@ import io.nekohasekai.sagernet.fmt.AbstractBean
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
 import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1Json
+import io.nekohasekai.sagernet.fmt.mieru.MieruBean
+import io.nekohasekai.sagernet.fmt.naive.NaiveBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
@@ -778,11 +780,37 @@ object RawUpdater : GroupUpdater() {
                                 it
                             }
                         }.map {
-                            ConfigBean().apply {
-                                applyDefaultValues()
-                                type = 1
-                                config = it.toStringPretty()
-                                name = it.getStr("tag")
+                            // RX-PRO: sing-box core has no naive/mieru outbound types —
+                            // convert them to native plugin-backed profiles instead of raw configs.
+                            when (it.getStr("type")) {
+                                "naive" -> NaiveBean().apply {
+                                    proto = if (it.optBoolean("quic", false)) "quic" else "https"
+                                    serverAddress = it.getStr("server")
+                                    serverPort = it.getIntNya("server_port") ?: 443
+                                    username = it.getStr("username") ?: ""
+                                    password = it.getStr("password") ?: ""
+                                    sni = it.optJSONObject("tls")?.getStr("server_name") ?: ""
+                                    name = it.getStr("tag")
+                                    initializeDefaultValues()
+                                }
+
+                                "mieru" -> MieruBean().apply {
+                                    serverAddress = it.getStr("server")
+                                    serverPort = it.getIntNya("server_port") ?: 2012
+                                    username = it.getStr("username") ?: ""
+                                    password = it.getStr("password") ?: ""
+                                    protocol = it.getStr("transport")?.uppercase() ?: "TCP"
+                                    it.getIntNya("mtu")?.let { m -> mtu = m }
+                                    name = it.getStr("tag")
+                                    initializeDefaultValues()
+                                }
+
+                                else -> ConfigBean().apply {
+                                    applyDefaultValues()
+                                    type = 1
+                                    config = it.toStringPretty()
+                                    name = it.getStr("tag")
+                                }
                             }
                         }
                 }
