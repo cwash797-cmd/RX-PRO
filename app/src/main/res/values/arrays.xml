@@ -346,6 +346,7 @@
 
     <string-array name="xhttp_security_value" translatable="false">
         <item>tls</item>
+        <item>reality</item>
         <item>none</item>
     </string-array>
 

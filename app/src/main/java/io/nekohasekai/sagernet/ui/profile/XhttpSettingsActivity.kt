@@ -40,6 +40,11 @@ class XhttpSettingsActivity : ProfileSettingsActivity<XhttpBean>() {
     private val fingerprint = pbm.add(PreferenceBinding(Type.Text, "fingerprint"))
     private val allowInsecure = pbm.add(PreferenceBinding(Type.Bool, "allowInsecure"))
 
+    // RX-PRO v1.5.0: REALITY support for XHTTP profiles
+    private val realityPublicKey = pbm.add(PreferenceBinding(Type.Text, "realityPublicKey"))
+    private val realityShortId = pbm.add(PreferenceBinding(Type.Text, "realityShortId"))
+    private val realitySpiderX = pbm.add(PreferenceBinding(Type.Text, "realitySpiderX"))
+
     override fun XhttpBean.init() {
         pbm.writeToCacheAll(this)
     }

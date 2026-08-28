@@ -770,6 +770,10 @@ object RawUpdater : GroupUpdater() {
         val vnextUser = vnext?.optJSONArray("users")?.optJSONObject(0)
 
         val tlsObj = stream?.optJSONObject("tlsSettings") ?: optJSONObject("tls")
+        // RX-PRO v1.5.0: REALITY — Xray style (streamSettings.realitySettings) and
+        // sing-box style (tls.reality) both supported.
+        val realityObj = stream?.optJSONObject("realitySettings")
+            ?: tlsObj?.optJSONObject("reality")?.takeIf { it.optBoolean("enabled", true) }
 
         return XhttpBean().apply {
             serverAddress = vnext?.getStr("address") ?: getStr("server")
@@ -780,10 +784,19 @@ object RawUpdater : GroupUpdater() {
             xhttpSettings?.getStr("host")?.let { host = it }
             xhttpSettings?.optJSONObject("extra")?.let { extraJson = it.toString() }
             security = when {
+                realityObj != null -> "reality"
+                stream?.getStr("security") == "reality" -> "reality"
                 stream?.getStr("security") == "tls" -> "tls"
                 tlsObj?.optBoolean("enabled", false) == true -> "tls"
                 tlsObj != null -> "tls"
                 else -> "none"
+            }
+            realityObj?.let { r ->
+                (r.getStr("publicKey") ?: r.getStr("public_key"))?.let { realityPublicKey = it }
+                (r.getStr("shortId") ?: r.getStr("short_id"))?.let { realityShortId = it }
+                (r.getStr("spiderX") ?: r.getStr("spider_x"))?.let { realitySpiderX = it }
+                (r.getStr("serverName") ?: r.getStr("server_name"))?.let { sni = it }
+                r.getStr("fingerprint")?.let { fingerprint = it }
             }
             tlsObj?.let { tls ->
                 (tls.getStr("serverName") ?: tls.getStr("server_name"))?.let { sni = it }

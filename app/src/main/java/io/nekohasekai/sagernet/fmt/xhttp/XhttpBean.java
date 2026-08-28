@@ -30,12 +30,16 @@ public class XhttpBean extends AbstractBean {
     public String host;
     // raw "extra" JSON from the share link (padding/xmux tuning), passed to Xray verbatim
     public String extraJson;
-    // TLS
-    public String security;  // tls / none
+    // TLS / REALITY
+    public String security;  // tls / reality / none
     public String sni;
     public String alpn;      // comma separated, e.g. "h2,http/1.1"
     public String fingerprint;
     public Boolean allowInsecure;
+    // RX-PRO v1.5.0: REALITY params (security=reality&pbk=...&sid=...&spx=...)
+    public String realityPublicKey;
+    public String realityShortId;
+    public String realitySpiderX;
 
     @Override
     public void initializeDefaultValues() {
@@ -50,11 +54,14 @@ public class XhttpBean extends AbstractBean {
         if (alpn == null) alpn = "";
         if (fingerprint == null) fingerprint = "";
         if (allowInsecure == null) allowInsecure = false;
+        if (realityPublicKey == null) realityPublicKey = "";
+        if (realityShortId == null) realityShortId = "";
+        if (realitySpiderX == null) realitySpiderX = "";
     }
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(0);
+        output.writeInt(1);
         super.serialize(output);
         output.writeString(uuid);
         output.writeString(mode);
@@ -66,6 +73,10 @@ public class XhttpBean extends AbstractBean {
         output.writeString(alpn);
         output.writeString(fingerprint);
         output.writeBoolean(allowInsecure);
+        // version 1
+        output.writeString(realityPublicKey);
+        output.writeString(realityShortId);
+        output.writeString(realitySpiderX);
     }
 
     @Override
@@ -82,6 +93,11 @@ public class XhttpBean extends AbstractBean {
         alpn = input.readString();
         fingerprint = input.readString();
         allowInsecure = input.readBoolean();
+        if (version >= 1) {
+            realityPublicKey = input.readString();
+            realityShortId = input.readString();
+            realitySpiderX = input.readString();
+        }
     }
 
     @NotNull

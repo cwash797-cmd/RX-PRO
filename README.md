@@ -7,7 +7,8 @@
 - ✅ NaiveProxy
 - ✅ Mieru
 - ✅ Hysteria2
-- ✅ VLESS (gRPC / WS / TLS, XHTTP — в разработке)
+- ✅ VLESS (gRPC / WS / TLS / REALITY)
+- ✅ VLESS XHTTP (через встроенный Xray-core, включая REALITY) — стабильно с v1.5.0
 
 ## Как пользоваться
 

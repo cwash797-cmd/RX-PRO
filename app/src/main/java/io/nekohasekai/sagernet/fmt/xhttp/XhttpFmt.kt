@@ -22,6 +22,7 @@ import org.json.JSONObject
 
 // vless://UUID@host:port?type=xhttp&mode=packet-up&path=/...&host=...&security=tls
 //   &sni=...&fp=chrome&alpn=h2,http/1.1&allowInsecure=1&extra=%7B...%7D#name
+// REALITY variant (v1.5.0): …&security=reality&pbk=<publicKey>&sid=<shortId>&spx=<spiderX>
 fun parseXhttp(link: String): XhttpBean {
     val url = ("https://" + link.substringAfter("://")).toHttpUrlOrNull()
         ?: error("Invalid xhttp link: $link")
@@ -42,6 +43,13 @@ fun parseXhttp(link: String): XhttpBean {
         url.queryParameter("alpn")?.takeIf { it.isNotBlank() }?.let { alpn = it }
         url.queryParameter("fp")?.takeIf { it.isNotBlank() }?.let { fingerprint = it }
         url.queryParameter("allowInsecure")?.let { allowInsecure = it == "1" || it == "true" }
+        // RX-PRO v1.5.0: REALITY params — previously silently DROPPED, which broke
+        // every XHTTP+REALITY share link (profile imported but never connected).
+        url.queryParameter("pbk")?.takeIf { it.isNotBlank() }?.let { realityPublicKey = it }
+        url.queryParameter("sid")?.takeIf { it.isNotBlank() }?.let { realityShortId = it }
+        url.queryParameter("spx")?.takeIf { it.isNotBlank() }?.let { realitySpiderX = it }
+        // Some panels emit pbk/sid without security=reality — normalize.
+        if (!realityPublicKey.isNullOrBlank() && security != "reality") security = "reality"
         // HttpUrl already percent-decodes the fragment
         name = url.fragment ?: ""
         initializeDefaultValues()
@@ -62,6 +70,11 @@ fun XhttpBean.toUri(): String {
     if (alpn.isNotBlank()) builder.addQueryParameter("alpn", alpn)
     if (fingerprint.isNotBlank()) builder.addQueryParameter("fp", fingerprint)
     if (allowInsecure) builder.addQueryParameter("allowInsecure", "1")
+    if (security == "reality") {
+        if (realityPublicKey.isNotBlank()) builder.addQueryParameter("pbk", realityPublicKey)
+        if (realityShortId.isNotBlank()) builder.addQueryParameter("sid", realityShortId)
+        if (realitySpiderX.isNotBlank()) builder.addQueryParameter("spx", realitySpiderX)
+    }
     if (name.isNotBlank()) builder.encodedFragment(name.urlSafe())
     return builder.toLink("vless")
 }
@@ -99,6 +112,19 @@ fun XhttpBean.buildXrayConfig(port: Int): String {
                     )
                 }
                 if (fingerprint.isNotBlank()) put("fingerprint", fingerprint)
+            })
+        }
+        // RX-PRO v1.5.0: REALITY support — XHTTP servers are commonly deployed
+        // behind REALITY; without realitySettings the outbound never connects.
+        if (security == "reality") {
+            put("security", "reality")
+            put("realitySettings", JSONObject().apply {
+                put("serverName", sni.ifBlank { host.ifBlank { serverAddress } })
+                put("publicKey", realityPublicKey)
+                if (realityShortId.isNotBlank()) put("shortId", realityShortId)
+                if (realitySpiderX.isNotBlank()) put("spiderX", realitySpiderX)
+                // Xray requires an explicit uTLS fingerprint with REALITY
+                put("fingerprint", fingerprint.ifBlank { "chrome" })
             })
         }
     }

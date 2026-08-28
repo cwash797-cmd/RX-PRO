@@ -63,4 +63,12 @@ fun mkPort(): Int {
     return port
 }
 
-const val USER_AGENT = "NekoBox/Android/" + BuildConfig.VERSION_NAME + " (Prefer ClashMeta Format)"
+// RX-PRO v1.5.0 FIX: the old "NekoBox/Android/…" UA made the RIXXX panel detect
+// us as a sing-box-family client and serve the sing-box JSON subscription. In
+// that JSON the panel converts bonus links via bonusUrlToSingboxOutbound(),
+// which only knows ws/grpc transports — a VLESS XHTTP bonus link loses its
+// transport entirely and arrives as a broken plain-VLESS outbound. With an
+// RX-PRO UA the panel falls back to the base64 URI list, where the
+// vless://…type=xhttp link is appended VERBATIM and parseXhttp() handles it
+// natively (naive/mieru/hy2 already parse fine from that list too).
+const val USER_AGENT = "RX-PRO/Android/" + BuildConfig.VERSION_NAME + " (Prefer ClashMeta Format)"

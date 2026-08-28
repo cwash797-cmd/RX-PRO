@@ -81,6 +81,21 @@
             app:icon="@drawable/ic_notification_enhanced_encryption"
             app:key="allowInsecure"
             app:title="@string/allow_insecure" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_vpn_key_24"
+            app:key="realityPublicKey"
+            app:title="Reality Public Key"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_vpn_key_24"
+            app:key="realityShortId"
+            app:title="Reality ShortId"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            app:icon="@drawable/ic_baseline_vpn_key_24"
+            app:key="realitySpiderX"
+            app:title="Reality SpiderX"
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
 </PreferenceScreen>
