@@ -52,6 +52,25 @@ fun parseXhttp(link: String): XhttpBean {
         if (!realityPublicKey.isNullOrBlank() && security != "reality") security = "reality"
         // HttpUrl already percent-decodes the fragment
         name = url.fragment ?: ""
+        // RX-PRO v1.5.1: some links carry mode/path/host ONLY inside the "extra"
+        // JSON. Xray's SplitHTTPConfig.Build() UNCONDITIONALLY overwrites
+        // extra.mode/path/host with the outer values — even when they're blank —
+        // so a blank outer mode would silently reset e.g. "packet-up" to "auto"
+        // and break servers that require a specific mode. Backfill from extra.
+        if (!extraJson.isNullOrBlank()) {
+            runCatching {
+                val extra = JSONObject(extraJson)
+                if (mode.isNullOrBlank() || mode == "auto") {
+                    extra.optString("mode").takeIf { it.isNotBlank() }?.let { mode = it }
+                }
+                if (path.isNullOrBlank() || path == "/") {
+                    extra.optString("path").takeIf { it.isNotBlank() }?.let { path = it }
+                }
+                if (host.isNullOrBlank()) {
+                    extra.optString("host").takeIf { it.isNotBlank() }?.let { host = it }
+                }
+            }
+        }
         initializeDefaultValues()
     }
 }
@@ -88,17 +107,26 @@ fun XhttpBean.toUri(): String {
 // localhost and the real upstream socket is opened by sing-box through the
 // protected fd — no traffic re-enters the tunnel.
 fun XhttpBean.buildXrayConfig(port: Int): String {
+    // RX-PRO v1.5.1: Xray's SplitHTTPConfig.Build() replaces the whole config
+    // with "extra" when present, then FORCE-overwrites extra's mode/path/host
+    // with the OUTER values — even blank ones. So the outer fields must always
+    // carry the effective values or they'd wipe out what's inside extra.
+    val extraObj: JSONObject? =
+        if (extraJson.isNotBlank()) runCatching { JSONObject(extraJson) }.getOrNull() else null
+    val effectiveMode = mode.ifBlank { extraObj?.optString("mode")?.ifBlank { null } ?: "auto" }
+    val effectivePath = path.ifBlank { extraObj?.optString("path") ?: "" }
+    val effectiveHost = host.ifBlank {
+        extraObj?.optString("host")?.ifBlank { null } ?: sni.ifBlank { serverAddress }
+    }
+
     val streamSettings = JSONObject().apply {
         put("network", "xhttp")
         put("xhttpSettings", JSONObject().apply {
-            put("mode", mode.ifBlank { "auto" })
-            if (path.isNotBlank()) put("path", path)
+            put("mode", effectiveMode)
+            if (effectivePath.isNotBlank()) put("path", effectivePath)
             // the HTTP Host header must stay the real (camouflage) domain
-            val xHost = host.ifBlank { sni.ifBlank { serverAddress } }
-            if (xHost.isNotBlank()) put("host", xHost)
-            if (extraJson.isNotBlank()) {
-                runCatching { put("extra", JSONObject(extraJson)) }
-            }
+            if (effectiveHost.isNotBlank()) put("host", effectiveHost)
+            extraObj?.let { put("extra", it) }
         })
         if (security == "tls") {
             put("security", "tls")

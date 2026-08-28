@@ -133,7 +133,7 @@ jobs:
           ./run init action gradle
           bash buildScript/lib/plugins.sh
           ./gradlew bundlePlayRelease
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: AAB
           path: app/build/outputs/bundle/playRelease/app-play-release.aab
