@@ -398,6 +398,10 @@ class ConfigurationFragment @JvmOverloads constructor(
                 })
             }
 
+            R.id.action_new_trusttunnel -> {
+                startActivity(Intent(requireActivity(), io.nekohasekai.sagernet.ui.profile.TrustTunnelSettingsActivity::class.java))
+            }
+
             R.id.action_new_xhttp -> {
                 startActivity(Intent(requireActivity(), XhttpSettingsActivity::class.java))
             }

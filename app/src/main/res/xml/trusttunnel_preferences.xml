@@ -1,0 +1,22 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+    <Preference app:title="TrustTunnel TEST · HTTP/2" app:summary="HTTP/3 и anti_dpi пока не поддерживаются. Client random prefix поддерживается. Используется первый адрес; остальные сохраняются для экспорта." />
+    <EditTextPreference app:key="name" app:title="@string/profile_name" app:useSimpleSummaryProvider="true" />
+    <EditTextPreference app:key="serverAddress" app:title="@string/server_address" app:useSimpleSummaryProvider="true" />
+    <EditTextPreference app:key="serverPort" app:title="@string/server_port" app:useSimpleSummaryProvider="true" />
+    <EditTextPreference app:key="username" app:title="Логин" />
+    <EditTextPreference app:key="password" app:title="Пароль" />
+    <PreferenceCategory app:title="TLS">
+        <EditTextPreference app:key="hostname" app:title="Имя сервера для проверки сертификата" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="sni" app:title="SNI (пусто = имя сервера)" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="clientRandomPrefix" app:title="Client random prefix / mask" app:useSimpleSummaryProvider="true" />
+        <EditTextPreference app:key="certificate" app:title="Сертификаты PEM" app:summary="Необязательные доверенные сертификаты из ссылки" />
+        <SwitchPreference app:key="skipVerification" app:title="Не проверять сертификат (небезопасно)" />
+    </PreferenceCategory>
+    <PreferenceCategory app:title="Дополнительно">
+        <EditTextPreference app:key="upstreamProtocol" app:title="Протокол: http2 / http3" app:useSimpleSummaryProvider="true" />
+        <SwitchPreference app:key="hasIpv6" app:title="IPv6 на выходном сервере" />
+        <SwitchPreference app:key="antiDpi" app:title="anti_dpi (недоступно в TEST)" />
+        <EditTextPreference app:key="dnsUpstreams" app:title="DNS для UDP-доменов" app:summary="По одному IP или tcp://IP:port на строку. Пусто = 1.1.1.1 через туннель." />
+        <EditTextPreference app:key="addresses" app:title="Импортированные адреса" app:summary="Сохраняются для экспорта; автоматическое переключение пока не реализовано." />
+    </PreferenceCategory>
+</PreferenceScreen>

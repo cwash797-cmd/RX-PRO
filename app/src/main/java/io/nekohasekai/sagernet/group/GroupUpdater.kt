@@ -54,6 +54,7 @@ abstract class GroupUpdater {
             when (profile) {
                 // SNI rewrite unsupported
                 is NaiveBean -> continue
+                is io.nekohasekai.sagernet.fmt.trusttunnel.TrustTunnelBean -> continue
                 // RX-PRO: XHTTP needs the original domain for TLS SNI / Host header
                 is XhttpBean -> continue
             }

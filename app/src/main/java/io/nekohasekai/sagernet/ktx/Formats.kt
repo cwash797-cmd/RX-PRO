@@ -117,8 +117,14 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
             throw SubscriptionFoundException(this)
         }
 
-        if (startsWith("sn://")) {
-            Logs.d("Try parse universal link: $this")
+        if (startsWith("tt://", ignoreCase = true)) {
+            runCatching {
+                entities.add(io.nekohasekai.sagernet.fmt.trusttunnel.parseTrustTunnel(this))
+            }.onFailure {
+                Logs.w("Invalid TrustTunnel link (credentials hidden)")
+            }
+        } else if (startsWith("sn://")) {
+            Logs.d("Try parse universal link (credentials hidden)")
             runCatching {
                 entities.add(parseUniversal(this))
             }.onFailure {

@@ -28,9 +28,13 @@ android {
         aidl = true
     }
     namespace = "io.nekohasekai.sagernet"
+    ndkVersion = "27.0.12077973"
+    testOptions.unitTests.isIncludeAndroidResources = true
+    sourceSets.getByName("test").resources.srcDir("schemas")
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            keepDebugSymbols += "**/libtrusttunnel.so"
         }
     }
     androidResources {
@@ -41,6 +45,9 @@ android {
 dependencies {
 
     implementation(fileTree("libs"))
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+    testImplementation("org.robolectric:robolectric:4.12.2")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
     implementation("androidx.core:core-ktx:1.9.0")

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">RX-PRO</string>
-    <string name="app_name_long" translatable="false">RX-PRO VPN Client</string>
+    <string name="app_name" translatable="false">RX-PRO TEST</string>
+    <string name="app_name_long" translatable="false">RX-PRO TrustTunnel TEST</string>
     <string name="app_desc">RX-PRO — VPN client for the RIXXX panel. Naive + Mieru + Hysteria2 + VLESS in one app.</string>
     <string name="project">Project</string>
     <string name="github">Source code</string>

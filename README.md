@@ -10,6 +10,35 @@
 - ✅ VLESS (gRPC / WS / TLS / REALITY)
 - ✅ VLESS XHTTP (через встроенный Xray-core, включая REALITY) — стабильно с v1.5.0
 
+## TrustTunnel TEST — ветка feature/trusttunnel-test
+
+Это отдельный **RX-PRO TEST 1.5.2-tt-test.1**, пакет `com.rixxx.rxpro.tttest`, arm64.
+Устанавливается рядом со стабильным RX-PRO; его профили не переносит и не изменяет.
+Стабильная **1.5.1 остаётся Latest**. Не включайте одновременно VPN в обоих приложениях.
+
+- Импорт `tt://?<base64url TLV>` и `tt://user:password@host:port?...`, в том числе из обычной/base64 подписки.
+- Редактор, QR/share в официальном TLV-формате, стандартный TCP/URL-тест задержки.
+- Собственный встроенный HTTP/2-адаптер по открытой спецификации TrustTunnel, не официальный SDK.
+- TCP CONNECT и SOCKS UDP через `_udp2`, проверка сертификата, отдельные hostname/SNI и client_random_prefix/mask.
+- Используется существующий VPNService и mapping внешнего upstream через sing-box; второй VPN не создаётся.
+- **Ограничения:** HTTP/3 и anti_dpi сохраняются в профиле, но запуск отклоняется. Из списка endpoint-адресов используется выбранный/первый; остальные сохраняются для экспорта. DNS в адаптере — IP или tcp://IP:port; DoH/DoT/DoQ пока отклоняются. ICMP через TrustTunnel не реализован. Настройки DNS самого RX-PRO продолжают действовать отдельно.
+- Проверки выполняются на локальных синтетических TLS/H2 endpoint и в Android JVM-тестах. Работа на реальном телефоне, сервере и LTE ещё требует пользовательской проверки; отсутствие утечек DNS не заявляется.
+- Ссылки содержат пароль. Не публикуйте их или экспорт конфигурации в issues/логах.
+
+Сборка TEST: Actions → **TrustTunnel TEST arm64** (на этой ветке), без автопубликации стабильного релиза.
+Локально нужны Java 17, Go 1.25.0, Android API/Build Tools 35/35.0.0, NDK 27.0.12077973:
+
+```bash
+./run lib core
+bash trusttunnel-core/build-android.sh
+bash buildScript/lib/plugins.sh
+bash buildScript/lib/assets.sh
+(cd trusttunnel-core && go test -race ./...)
+./gradlew :app:testOssDebugUnitTest :app:assembleOssRelease
+```
+
+Для release-подписи используются существующие KEYSTORE_PASS/ALIAS_NAME/ALIAS_PASS либо LOCAL_PROPERTIES; секреты не хранить в исходниках. Адаптер использует uTLS (BSD-3-Clause) и golang.org/x/net (BSD-3-Clause); версии закреплены в go.mod/go.sum. Форматы: [TrustTunnel protocol](https://github.com/TrustTunnel/TrustTunnel/blob/master/PROTOCOL.md), [deep links](https://github.com/TrustTunnel/TrustTunnel/blob/master/DEEP_LINK.md).
+
 ## Как пользоваться
 
 1. Скачайте APK из [Releases](https://github.com/cwash797-cmd/RX-PRO/releases) (arm64-v8a для современных телефонов)

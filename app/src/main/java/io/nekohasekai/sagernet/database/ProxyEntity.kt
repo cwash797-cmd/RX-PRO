@@ -7,6 +7,7 @@ import com.esotericsoftware.kryo.io.ByteBufferInput
 import com.esotericsoftware.kryo.io.ByteBufferOutput
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.fmt.*
+import io.nekohasekai.sagernet.fmt.trusttunnel.*
 import io.nekohasekai.sagernet.fmt.http.HttpBean
 import io.nekohasekai.sagernet.fmt.http.toUri
 import io.nekohasekai.sagernet.fmt.hysteria.*
@@ -72,6 +73,7 @@ data class ProxyEntity(
     var shadowTLSBean: ShadowTLSBean? = null,
     var anyTLSBean: AnyTLSBean? = null,
     var xhttpBean: XhttpBean? = null,
+    var trustTunnelBean: TrustTunnelBean? = null,
     var chainBean: ChainBean? = null,
     var nekoBean: NekoBean? = null,
     var configBean: ConfigBean? = null,
@@ -97,6 +99,7 @@ data class ProxyEntity(
 
         // RX-PRO: VLESS XHTTP, executed through the bundled Xray-core binary
         const val TYPE_XHTTP = 23
+        const val TYPE_TRUSTTUNNEL = 24
 
         const val TYPE_CONFIG = 998
         const val TYPE_NEKO = 999
@@ -182,6 +185,7 @@ data class ProxyEntity(
             TYPE_SHADOWTLS -> shadowTLSBean = KryoConverters.shadowTLSDeserialize(byteArray)
             TYPE_ANYTLS -> anyTLSBean = KryoConverters.anyTLSDeserialize(byteArray)
             TYPE_XHTTP -> xhttpBean = KryoConverters.xhttpDeserialize(byteArray)
+            TYPE_TRUSTTUNNEL -> trustTunnelBean = KryoConverters.trustTunnelDeserialize(byteArray)
             TYPE_CHAIN -> chainBean = KryoConverters.chainDeserialize(byteArray)
             TYPE_NEKO -> nekoBean = KryoConverters.nekoDeserialize(byteArray)
             TYPE_CONFIG -> configBean = KryoConverters.configDeserialize(byteArray)
@@ -204,6 +208,7 @@ data class ProxyEntity(
         TYPE_SHADOWTLS -> "ShadowTLS"
         TYPE_ANYTLS -> "AnyTLS"
         TYPE_XHTTP -> "VLESS-XHTTP"
+        TYPE_TRUSTTUNNEL -> "TrustTunnel"
         TYPE_CHAIN -> chainName
         TYPE_NEKO -> nekoBean!!.displayType()
         TYPE_CONFIG -> configBean!!.displayType()
@@ -230,6 +235,7 @@ data class ProxyEntity(
             TYPE_SHADOWTLS -> shadowTLSBean
             TYPE_ANYTLS -> anyTLSBean
             TYPE_XHTTP -> xhttpBean
+            TYPE_TRUSTTUNNEL -> trustTunnelBean
             TYPE_CHAIN -> chainBean
             TYPE_NEKO -> nekoBean
             TYPE_CONFIG -> configBean
@@ -268,6 +274,7 @@ data class ProxyEntity(
             is TuicBean -> toUri()
             is AnyTLSBean -> toUri()
             is XhttpBean -> toUri()
+            is TrustTunnelBean -> toUri()
             is NekoBean -> ""
             else -> toUniversalLink()
         }
@@ -308,6 +315,11 @@ data class ProxyEntity(
                                 append(bean.buildHysteria1Config(port, null))
                             }
 
+                            is TrustTunnelBean -> {
+                                append("\n\n")
+                                append(bean.buildTrustTunnelConfig(port))
+                            }
+
                             is XhttpBean -> {
                                 append("\n\n")
                                 append(bean.buildXrayConfig(port))
@@ -325,6 +337,7 @@ data class ProxyEntity(
             TYPE_MIERU -> true
             TYPE_NAIVE -> true
             TYPE_XHTTP -> true
+            TYPE_TRUSTTUNNEL -> true
             TYPE_HYSTERIA -> !hysteriaBean!!.canUseSingBox()
             TYPE_NEKO -> true
             else -> false
@@ -375,6 +388,7 @@ data class ProxyEntity(
         shadowTLSBean = null
         anyTLSBean = null
         xhttpBean = null
+        trustTunnelBean = null
         chainBean = null
         configBean = null
         nekoBean = null
@@ -450,6 +464,11 @@ data class ProxyEntity(
                 anyTLSBean = bean
             }
 
+            is TrustTunnelBean -> {
+                type = TYPE_TRUSTTUNNEL
+                trustTunnelBean = bean
+            }
+
             is XhttpBean -> {
                 type = TYPE_XHTTP
                 xhttpBean = bean
@@ -493,6 +512,7 @@ data class ProxyEntity(
                 TYPE_SHADOWTLS -> ShadowTLSSettingsActivity::class.java
                 TYPE_ANYTLS -> AnyTLSSettingsActivity::class.java
                 TYPE_XHTTP -> XhttpSettingsActivity::class.java
+                TYPE_TRUSTTUNNEL -> TrustTunnelSettingsActivity::class.java
                 TYPE_CHAIN -> ChainSettingsActivity::class.java
                 TYPE_CONFIG -> ConfigSettingActivity::class.java
                 else -> throw IllegalArgumentException()

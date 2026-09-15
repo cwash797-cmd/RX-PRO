@@ -6,6 +6,8 @@ import io.nekohasekai.sagernet.bg.AbstractInstance
 import io.nekohasekai.sagernet.bg.GuardedProcessPool
 import io.nekohasekai.sagernet.database.DataStore
 import io.nekohasekai.sagernet.database.ProxyEntity
+import io.nekohasekai.sagernet.fmt.trusttunnel.TrustTunnelBean
+import io.nekohasekai.sagernet.fmt.trusttunnel.buildTrustTunnelConfig
 import io.nekohasekai.sagernet.fmt.ConfigBuildResult
 import io.nekohasekai.sagernet.fmt.buildConfig
 import io.nekohasekai.sagernet.fmt.hysteria.HysteriaBean
@@ -72,6 +74,12 @@ abstract class BoxInstance(
                     is NaiveBean -> {
                         initPlugin("naive-plugin")
                         pluginConfigs[port] = profile.type to bean.buildNaiveConfig(port)
+                    }
+
+                    is TrustTunnelBean -> {
+                        check(android.os.Build.SUPPORTED_ABIS.contains("arm64-v8a")) { "TrustTunnel TEST requires arm64-v8a" }
+                        initPlugin("trusttunnel-plugin")
+                        pluginConfigs[port] = profile.type to bean.buildTrustTunnelConfig(port)
                     }
 
                     is XhttpBean -> {
@@ -175,6 +183,38 @@ abstract class BoxInstance(
                         )
 
                         processes.start(commands, envMap)
+                    }
+
+                    bean is TrustTunnelBean -> {
+                        val configFile = File.createTempFile("trusttunnel_", ".json", cacheDir)
+                        android.system.Os.chmod(configFile.absolutePath, 384) // 0600
+                        cacheFiles.add(configFile)
+                        configFile.writeText(config)
+                        val caFile = File.createTempFile("trusttunnel_ca_", ".pem", cacheDir)
+                        android.system.Os.chmod(caFile.absolutePath, 384)
+                        cacheFiles.add(caFile)
+                        val store = java.security.KeyStore.getInstance("AndroidCAStore").apply { load(null) }
+                        caFile.bufferedWriter().use { output ->
+                            val aliases = store.aliases()
+                            while (aliases.hasMoreElements()) {
+                                val cert = store.getCertificate(aliases.nextElement()) ?: continue
+                                output.appendLine("-----BEGIN CERTIFICATE-----")
+                                output.appendLine(android.util.Base64.encodeToString(cert.encoded, android.util.Base64.NO_WRAP).chunked(64).joinToString("\n"))
+                                output.appendLine("-----END CERTIFICATE-----")
+                            }
+                        }
+                        processes.start(mutableListOf(initPlugin("trusttunnel-plugin").path, "--config", configFile.absolutePath),
+                            mutableMapOf("RXPRO_CA_FILE" to caFile.absolutePath))
+                        // Wait for the loopback listener only. No upstream traffic before box.start().
+                        val deadline = SystemClock.elapsedRealtime() + 5000
+                        var ready = false
+                        while (!ready && SystemClock.elapsedRealtime() < deadline) {
+                            ready = runCatching {
+                                java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 100) }
+                            }.isSuccess
+                            if (!ready) SystemClock.sleep(25)
+                        }
+                        check(ready) { "TrustTunnel local SOCKS listener did not start; check logs" }
                     }
 
                     bean is XhttpBean -> {

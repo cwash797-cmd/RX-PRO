@@ -152,6 +152,12 @@ public class KryoConverters {
 
 
     @TypeConverter
+    public static io.nekohasekai.sagernet.fmt.trusttunnel.TrustTunnelBean trustTunnelDeserialize(byte[] bytes) {
+        if (JavaUtil.isEmpty(bytes)) return null;
+        return deserialize(new io.nekohasekai.sagernet.fmt.trusttunnel.TrustTunnelBean(), bytes);
+    }
+
+    @TypeConverter
     public static XhttpBean xhttpDeserialize(byte[] bytes) {
         if (JavaUtil.isEmpty(bytes)) return null;
         return deserialize(new XhttpBean(), bytes);

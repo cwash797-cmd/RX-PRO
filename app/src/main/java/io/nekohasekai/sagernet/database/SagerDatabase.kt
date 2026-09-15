@@ -16,13 +16,13 @@ import kotlinx.coroutines.launch
 
 @Database(
     entities = [ProxyGroup::class, ProxyEntity::class, RuleEntity::class],
-    version = 7,
+    version = 8,
     autoMigrations = [
         AutoMigration(from = 3, to = 4),
         AutoMigration(from = 4, to = 5),
         AutoMigration(from = 5, to = 6),
-        // RX-PRO: added proxy_entities.xhttpBean (VLESS XHTTP profiles)
-        AutoMigration(from = 6, to = 7)
+        // Schema 7 was not committed upstream; generate a direct safe 6 -> 8 path.
+        AutoMigration(from = 6, to = 8)
     ]
 )
 @TypeConverters(value = [KryoConverters::class, GsonConverters::class])
@@ -30,6 +30,11 @@ import kotlinx.coroutines.launch
 abstract class SagerDatabase : RoomDatabase() {
 
     companion object {
+        val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE proxy_entities ADD COLUMN trustTunnelBean BLOB")
+            }
+        }
         @OptIn(DelicateCoroutinesApi::class)
         @Suppress("EXPERIMENTAL_API_USAGE")
         val instance by lazy {
@@ -39,7 +44,8 @@ abstract class SagerDatabase : RoomDatabase() {
                 .setJournalMode(JournalMode.TRUNCATE)
                 .allowMainThreadQueries()
                 .enableMultiInstanceInvalidation()
-                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_7_8)
+                // Never erase profiles on an unsupported upgrade/downgrade.
                 .setQueryExecutor { GlobalScope.launch { it.run() } }
                 .build()
         }

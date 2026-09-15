@@ -18,3 +18,6 @@ jniLibs/
 
 # submodules
 /external
+/libcore/gomobile/
+/app/*-build.log
+/test-dist/

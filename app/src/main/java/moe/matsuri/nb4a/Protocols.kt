@@ -21,6 +21,13 @@ object Protocols {
             if (bean is ConfigBean) {
                 return bean.config
             }
+            if (bean is io.nekohasekai.sagernet.fmt.trusttunnel.TrustTunnelBean) {
+                // Same endpoint may contain separate accounts or TLS settings.
+                val normalized = bean.clone().apply { name = "" }
+                val bytes = io.nekohasekai.sagernet.fmt.KryoConverters.serialize(normalized)
+                return java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(bytes).joinToString("") { "%02x".format(it) }
+            }
             return bean.serverAddress + bean.serverPort + type
         }
 
