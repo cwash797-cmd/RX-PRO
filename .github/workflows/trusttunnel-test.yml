@@ -32,6 +32,9 @@ jobs:
         run: |
           grep -qx 'PACKAGE_NAME=com.rixxx.rxpro.tttest' nb4a.properties
           grep -q 'VERSION_NAME=.*tt-test' nb4a.properties
+          # Hosted runner images rotate SDKs; provision ONLY the fixed versions
+          # on the ephemeral GitHub runner (the development sandbox is unchanged).
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'ndk;27.0.12077973' 'build-tools;35.0.0' 'platforms;android-35'
           test -d "$ANDROID_HOME/ndk/27.0.12077973"
           test -d "$ANDROID_HOME/build-tools/35.0.0"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
