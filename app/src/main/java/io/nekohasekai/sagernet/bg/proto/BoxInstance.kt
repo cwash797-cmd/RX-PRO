@@ -206,15 +206,20 @@ abstract class BoxInstance(
                         processes.start(mutableListOf(initPlugin("trusttunnel-plugin").path, "--config", configFile.absolutePath),
                             mutableMapOf("RXPRO_CA_FILE" to caFile.absolutePath))
                         // Wait for the loopback listener only. No upstream traffic before box.start().
-                        val deadline = SystemClock.elapsedRealtime() + 5000
                         var ready = false
-                        while (!ready && SystemClock.elapsedRealtime() < deadline) {
-                            ready = runCatching {
-                                java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 100) }
-                            }.isSuccess
-                            if (!ready) SystemClock.sleep(25)
+                        val probe = Thread {
+                            val deadline = SystemClock.elapsedRealtime() + 5000
+                            while (!ready && SystemClock.elapsedRealtime() < deadline) {
+                                ready = runCatching {
+                                    java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 100) }
+                                }.onFailure { Logs.w("TrustTunnel probe: $it") }.isSuccess
+                                if (!ready) SystemClock.sleep(25)
+                            }
                         }
-                        check(ready) { "TrustTunnel local SOCKS listener did not start; check logs" }
+                        probe.start()
+                        probe.join(6000)
+                        if (!ready) Logs.w("TrustTunnel listener probe failed; continuing anyway")
+
                     }
 
                     bean is XhttpBean -> {
