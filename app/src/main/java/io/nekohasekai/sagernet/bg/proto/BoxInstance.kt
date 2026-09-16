@@ -77,7 +77,7 @@ abstract class BoxInstance(
                     }
 
                     is TrustTunnelBean -> {
-                        check(android.os.Build.SUPPORTED_ABIS.contains("arm64-v8a")) { "TrustTunnel TEST requires arm64-v8a" }
+                        check(android.os.Build.SUPPORTED_ABIS.contains("arm64-v8a")) { "TrustTunnel requires arm64-v8a" }
                         initPlugin("trusttunnel-plugin")
                         pluginConfigs[port] = profile.type to bean.buildTrustTunnelConfig(port)
                     }

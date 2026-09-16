@@ -1,13 +1,11 @@
 package io.nekohasekai.sagernet.bg.proto
 
-import io.nekohasekai.sagernet.BuildConfig
 import io.nekohasekai.sagernet.bg.BaseService
 import io.nekohasekai.sagernet.bg.ServiceNotification
 import io.nekohasekai.sagernet.database.ProxyEntity
 import io.nekohasekai.sagernet.ktx.Logs
 import io.nekohasekai.sagernet.ktx.runOnDefaultDispatcher
 import kotlinx.coroutines.runBlocking
-import moe.matsuri.nb4a.utils.JavaUtil
 
 class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = null) :
     BoxInstance(profile) {
@@ -24,8 +22,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         super.buildConfig()
         lastSelectorGroupId = super.config.selectorGroupId
         //
-        if (notTmp) Logs.d(config.config)
-        if (notTmp && BuildConfig.DEBUG) Logs.d(JavaUtil.gson.toJson(config.trafficMap))
+        if (notTmp) Logs.d("Core configuration prepared (credentials hidden)")
     }
 
     // only use this in temporary instance
@@ -37,11 +34,11 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     override suspend fun init() {
         super.init()
         pluginConfigs.forEach { (_, plugin) ->
-            val (type, content) = plugin
+            val (type, _) = plugin
             if (type == ProxyEntity.TYPE_TRUSTTUNNEL) {
                 Logs.d(io.nekohasekai.sagernet.fmt.trusttunnel.trustTunnelConfigLogMessage())
             } else {
-                Logs.d(content)
+                Logs.d("External profile configuration prepared (type=$type; credentials hidden)")
             }
         }
     }

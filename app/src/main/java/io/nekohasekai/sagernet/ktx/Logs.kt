@@ -55,6 +55,20 @@ object Logs {
 
 }
 
+/** Categorize errors without exporting exception text, URIs or peer identities. */
+fun connectionFailureCategory(error: Throwable): String {
+    val message = error.message.orEmpty().lowercase()
+    return when {
+        "no recent network activity" in message -> "QUIC_NO_RESPONSE"
+        "context canceled" in message || "operation was canceled" in message ||
+            error is java.util.concurrent.CancellationException -> "CANCELLED"
+        "timeout" in message || "deadline" in message -> "TIMEOUT"
+        "x509" in message || "certificate" in message -> "TLS_CERTIFICATE"
+        "refused" in message -> "CONNECTION_REFUSED"
+        else -> "CONNECTION_FAILED"
+    }
+}
+
 fun InputStream.use(out: OutputStream) {
     use { input ->
         out.use { output ->

@@ -1,42 +1,56 @@
-# RX-PRO — VPN клиент для панели RIXXX
+# RX-PRO 1.5.4
 
-Единый Android-клиент для панели [Panel-Naive-Mieru-by-RIXXX](https://github.com/cwash797-cmd/Panel-Naive-Mieru-by-RIXXX).
+Android-клиент для панели [Panel-Naive-Mieru-by-RIXXX](https://github.com/cwash797-cmd/Panel-Naive-Mieru-by-RIXXX).
 
-**Одна подписка — все протоколы:**
+## Протоколы
 
-- ✅ NaiveProxy
-- ✅ Mieru
-- ✅ Hysteria2
-- ✅ VLESS (gRPC / WS / TLS / REALITY)
-- ✅ VLESS XHTTP (через встроенный Xray-core, включая REALITY) — стабильно с v1.5.0
+- TrustTunnel по HTTP/2, со встроенным адаптером.
+- NaiveProxy, Mieru, Hysteria2.
+- VLESS: gRPC, WS, TLS, REALITY и XHTTP через встроенный Xray-core.
 
-## TrustTunnel TEST — ветка fix/trusttunnel-reliability
+## Установка и обновление
 
-Это отдельный **RX-PRO TEST 1.5.2-tt-test.2**, пакет `com.rixxx.rxpro.tttest`, arm64.
-Устанавливается рядом со стабильным RX-PRO; его профили не переносит и не изменяет.
-Стабильная **1.5.1 остаётся Latest**. Не включайте одновременно VPN в обоих приложениях.
+Скачайте APK arm64-v8a из [Releases](https://github.com/cwash797-cmd/RX-PRO/releases), добавьте подписку и выберите профиль.
 
-- Импорт `tt://?<base64url TLV>` и `tt://user:password@host:port?...`, в том числе из обычной/base64 подписки.
-- Редактор, QR/share в официальном TLV-формате, стандартный TCP/URL-тест задержки.
-- Собственный встроенный HTTP/2-адаптер по открытой спецификации TrustTunnel, не официальный SDK.
-- TCP CONNECT и SOCKS UDP через `_udp2`, проверка сертификата, отдельные hostname/SNI и client_random_prefix/mask.
-- Используется существующий VPNService и mapping внешнего upstream через sing-box; второй VPN не создаётся.
-- **Ограничения:** HTTP/3 и anti_dpi сохраняются в профиле, но запуск отклоняется. Из списка endpoint-адресов используется выбранный/первый; остальные сохраняются для экспорта. DNS в адаптере — IP или tcp://IP:port; DoH/DoT/DoQ пока отклоняются. ICMP через TrustTunnel не реализован. Настройки DNS самого RX-PRO продолжают действовать отдельно.
-- Проверки выполняются на локальных синтетических TLS/H2 endpoint и в Android JVM-тестах. Работа на реальном телефоне, сервере и LTE ещё требует пользовательской проверки; отсутствие утечек DNS не заявляется.
-- Ссылки содержат пароль. Не публикуйте их или экспорт конфигурации в issues/логах.
+Версия 1.5.4 использует основной пакет `com.rixxx.rxpro` и ключ подписи RX-PRO. Она обновляет обычный RX-PRO 1.5.1 без удаления приложения; миграция базы сохраняет профили. Перед обновлением рекомендуется резервная копия в безопасном месте. После перехода на новую схему базы откат на старый APK без восстановления резервной копии не поддерживается.
 
-### Исправления test.2 поверх пользовательской TEST FIX (eef80d6)
+Если прежняя 1.5.2 была установлена отдельным приложением, её данные изолированы Android. Для перехода добавьте подписку в основном RX-PRO заново либо перенесите профили через экспорт/импорт. Не включайте VPN одновременно в двух клиентах.
 
-- Проверка SOCKS5-рукопожатия в Dispatchers.IO с отменой при Stop, без блокировки Main через join и без продолжения запуска после ошибки.
-- Задача подключения сохраняется до старта, чтобы Stop действительно отменял незавершённый запуск.
-- Закрытая до первого запроса H2-сессия больше не выбирается повторно навсегда. Дефект воспроизведён отдельным тестом до исправления.
-- Stop прерывает зависший TLS handshake до ожидания mutex. Добавлены тесты остановки и повторного подключения.
-- Убрана запись полного JSON TrustTunnel в общий лог плагинов. Старые TEST/FIX могли записывать credentials: не публикуйте старые логи, при их раскрытии смените пароль.
-- Безопасные диагностические категории различают таймаут, закрытие транспорта и ошибки сертификата, не печатая endpoint и пароль.
-- Это проверочная сборка. Стабильный выпуск требует повторных тестов на проблемных устройствах Android 13/16, Wi-Fi/LTE, после сна и длительного простоя. Совпадение обнаруженных дефектов с каждым пользовательским сбоем пока не доказано.
+## TrustTunnel
 
-Сборка TEST: Actions → **TrustTunnel TEST arm64** (на этой ветке), без автопубликации стабильного релиза.
-Локально нужны Java 17, Go 1.25.0, Android API/Build Tools 35/35.0.0, NDK 27.0.12077973:
+Поддерживаются официальный `tt://?<base64url TLV>` и человекочитаемый `tt://user:password@host:port?...`, включая обычные и Base64-подписки. Доступны редактор, QR/share, стандартный URL-тест задержки, Start/Stop.
+
+Адаптер реализует TLS, отдельные hostname/SNI, client_random_prefix/mask, TCP CONNECT и UDP через `_udp2`. Используется существующий VPNService и защищённый upstream через sing-box; второй VPN не создаётся. Не нужны отдельный лаунчер, Termux, root или ручной SOCKS.
+
+Границы поддержки:
+- TrustTunnel доступен в arm64-сборке и использует HTTP/2. HTTP/3 и anti_dpi=true сохраняются при импорте, но запуск отклоняется. Client random prefix поддерживается независимо от anti_dpi.
+- Используется первый/выбранный endpoint без автоматического переключения; остальные адреса сохраняются для экспорта.
+- DNS для UDP-доменов внутри адаптера: IP или tcp://IP:port. DoH/DoT/DoQ в этом поле не поддерживаются. Настройки DNS самого RX-PRO действуют отдельно.
+- ICMP relay через TrustTunnel не реализован. Для проверки туннеля используйте URL-тест, а не только ICMP/TCP ping.
+
+## Изменения 1.5.4
+
+- TrustTunnel включён в основной RX-PRO с восстановлением после закрытия HTTP/2-сессии.
+- Проверка SOCKS5 выполняется вне главного потока, не блокирует интерфейс и отменяется при Stop.
+- Исправлена остановка во время незавершённого TLS-рукопожатия.
+- Убраны полные ссылки и тексты ошибок парсеров из журнала импорта; полные конфигурации ядра/плагинов больше не записываются при запуске и URL-тестировании.
+- Добавлены безопасные категории ошибок URL-теста, включая QUIC_NO_RESPONSE.
+- Исправлены название RX-PRO в локализациях и заголовок диагностического отчёта.
+- Версии sing-box, Xray, Naive и Mieru, а также логика XHTTP-парсера не менялись.
+
+### О Hysteria2
+
+Ошибка `timeout: no recent network activity` означает, что QUIC не получил ожидаемой активности вовремя. Она сама по себе не доказывает неверный пароль или ошибку импорта. Возможны недоступность сервера, фильтрация UDP, неверная серверная конфигурация или особенности сетевого маршрута. `context canceled` после Stop/смены профиля отражает отмену операции.
+
+В 1.5.4 нет заявления об исправлении сетевой доступности Hy2: порт, пароль, SNI и TLS-параметры в рассмотренном случае переносились из URI корректно. Проверка сертификата не отключается для обхода таймаутов.
+
+## Диагностика и безопасность
+
+Ссылки и экспорт профилей содержат пароли. Старые диагностические журналы могли содержать ссылки и полные конфигурации. Не публикуйте их; при раскрытии смените credentials. Новые журналы по-прежнему могут содержать адреса и домены сетевых подключений и требуют проверки перед передачей третьим лицам. Полная анонимность журналов и отсутствие DNS-утечек не заявляются.
+
+## Сборка
+
+Требуются Java 17, Go 1.25.0, Android API 35 / Build Tools 35.0.0 и NDK 27.0.12077973.
 
 ```bash
 ./run lib core
@@ -47,36 +61,11 @@ bash buildScript/lib/assets.sh
 ./gradlew :app:testOssDebugUnitTest :app:assembleOssRelease
 ```
 
-Для release-подписи используются существующие KEYSTORE_PASS/ALIAS_NAME/ALIAS_PASS либо LOCAL_PROPERTIES; секреты не хранить в исходниках. Адаптер использует uTLS (BSD-3-Clause) и golang.org/x/net (BSD-3-Clause); версии закреплены в go.mod/go.sum. Форматы: [TrustTunnel protocol](https://github.com/TrustTunnel/TrustTunnel/blob/master/PROTOCOL.md), [deep links](https://github.com/TrustTunnel/TrustTunnel/blob/master/DEEP_LINK.md).
+Подпись настраивается через KEYSTORE_PASS, ALIAS_NAME, ALIAS_PASS либо LOCAL_PROPERTIES. Секреты не хранить в исходниках. Публикуется arm64 APK с проверенной подписью и SHA256. GitHub Actions: Android arm64 Build; Release Build публикует только при явно включённом параметре publish и не перезаписывает существующие релизы.
 
-## Как пользоваться
+## Лицензия
 
-1. Скачайте APK из [Releases](https://github.com/cwash797-cmd/RX-PRO/releases) (arm64-v8a для современных телефонов)
-2. Установите и откройте приложение
-3. Вставьте ссылку подписки из панели → всё настроится автоматически
-4. Нажмите «Подключить»
+Форк [NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid), GPL-3.0 — см. [LICENSE](LICENSE).
+Используются sing-box, NaiveProxy, Mieru, Xray и собственная реализация по открытым спецификациям [TrustTunnel](https://github.com/TrustTunnel/TrustTunnel/blob/master/PROTOCOL.md). Это не официальный SDK TrustTunnel. Зависимости адаптера закреплены в go.mod/go.sum; лицензии включены в APK.
 
-## Сборка из исходников
-
-Проект собирается полностью через GitHub Actions (вкладка Actions → Release Build).
-Локальная сборка: см. скрипты в `buildScript/`.
-
-```
-./run lib core                     # сборка Go-ядра (libcore.aar)
-./gradlew app:assembleOssRelease   # сборка APK
-```
-
-## Лицензия и благодарности
-
-Проект является форком [NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid) (MatsuriDayo)
-и распространяется под лицензией **GPL-3.0** — см. [LICENSE](LICENSE).
-
-Использует:
-- [sing-box](https://github.com/SagerNet/sing-box) (SagerNet)
-- [NaiveProxy](https://github.com/klzgrad/naiveproxy) (klzgrad)
-- [Mieru](https://github.com/enfein/mieru) (enfein)
-
-## Контакты
-
-- Telegram: [@russian_paradice_vpn](https://t.me/russian_paradice_vpn)
-- Автор панели: RIXXX
+Контакты: [@russian_paradice_vpn](https://t.me/russian_paradice_vpn).

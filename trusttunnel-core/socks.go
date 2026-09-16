@@ -144,7 +144,7 @@ func dnsAddress(value string) (string, error) {
 	}
 	host, port, err := net.SplitHostPort(value)
 	if err != nil {
-		return "", errors.New("DNS upstream must be an IP address or tcp://IP:port in this TEST")
+		return "", errors.New("DNS upstream must be an IP address or tcp://IP:port")
 	}
 	if _, err = netip.ParseAddr(host); err != nil {
 		return "", errors.New("DNS bootstrap must be an IP address")

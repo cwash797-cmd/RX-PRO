@@ -122,6 +122,45 @@ class TrustTunnelTest {
         assertEquals(1, proxies.filterIsInstance<MieruBean>().size)
         assertEquals(1, proxies.filterIsInstance<HysteriaBean>().size)
     }
+    @Test fun hy2AliasesPreserveTlsPortAndEncodedPassword() = runBlocking {
+        for (scheme in listOf("hysteria2", "hy2")) {
+            val parsed = parseProxies("$scheme://fixture%3Apassword%40only@hy.example.com:8443?sni=cert.example.com&insecure=0#Hysteria")
+            val b = parsed.single() as HysteriaBean
+            assertEquals(2, b.protocolVersion.toInt())
+            assertEquals("8443", b.serverPorts)
+            assertEquals("fixture:password@only", b.authPayload)
+            assertEquals("hy.example.com", b.serverAddress)
+            assertEquals("cert.example.com", b.sni)
+            assertFalse(b.allowInsecure)
+            assertTrue(b.obfuscation.isEmpty())
+            assertEquals(b.authPayload, (KryoConverters.hysteriaDeserialize(KryoConverters.serialize(b))!!).authPayload)
+        }
+    }
+    @Test fun importLogsNeverContainLinksOrParserExceptionSecrets() = runBlocking {
+        org.robolectric.shadows.ShadowLog.clear()
+        val secret = "PRIVATE-CREDENTIAL-FIXTURE"
+        val links = listOf(
+            "hysteria2://$secret@hy.example.com:443?sni=hy.example.com",
+            "hy2://$secret@hy.example.com:99999",
+            "naive+https://user:$secret@naive.example.com:443",
+            "mierus://user:$secret@mieru.example.com?port=2012",
+            "vless://$secret@x.example.com:99999?type=xhttp",
+            "tt://user:$secret@tt.example.com:443?alpn=h2")
+        parseProxies(links.joinToString("\n"))
+        val logs = org.robolectric.shadows.ShadowLog.getLogsForTag("Test").joinToString("\n") { it.msg }
+        assertTrue(logs.isNotEmpty())
+        assertFalse(logs.contains(secret))
+        assertFalse(logs.contains("hy.example.com"))
+        assertFalse(logs.contains("naive.example.com"))
+        assertFalse(logs.contains("vless://"))
+    }
+    @Test fun networkFailureCategoriesDoNotIncludePrivateErrorText() {
+        fun category(text: String) = io.nekohasekai.sagernet.ktx.connectionFailureCategory(java.io.IOException(text))
+        assertEquals("QUIC_NO_RESPONSE", category("timeout: no recent network activity; private.example"))
+        assertEquals("CANCELLED", category("dial udp private.example: operation was canceled"))
+        assertEquals("TLS_CERTIFICATE", category("x509: certificate is invalid for private.example"))
+        assertEquals("CONNECTION_FAILED", category("private-password-value"))
+    }
     @Test fun dedupKeepsDistinctAccounts() {
         val first = parseTrustTunnel(human)
         val second = first.clone().apply { password = "another-password" }

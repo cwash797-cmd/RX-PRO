@@ -159,8 +159,8 @@ fun TrustTunnelBean.toUri(): String {
 }
 
 fun TrustTunnelBean.buildTrustTunnelConfig(port: Int): String {
-    require(upstreamProtocol == "http2") { "TrustTunnel TEST supports HTTP/2 only; HTTP/3 profile was preserved but cannot run yet." }
-    require(!antiDpi) { "TrustTunnel anti_dpi flag is not supported in this TEST. client_random_prefix is supported." }
+    require(upstreamProtocol == "http2") { "TrustTunnel supports HTTP/2 only; the HTTP/3 profile was preserved but is not supported." }
+    require(!antiDpi) { "TrustTunnel anti_dpi flag is not supported. client_random_prefix is supported." }
     dnsUpstreams.lines().filter { it.isNotBlank() }.forEach { value ->
         val raw = value.removePrefix("tcp://")
         val ip = raw.removeSurrounding("[", "]")
@@ -169,7 +169,7 @@ fun TrustTunnelBean.buildTrustTunnelConfig(port: Int): String {
         val host = url?.host.orEmpty()
         val numericHost = com.google.common.net.InetAddresses.isInetAddress(host)
         require(literal || (url != null && numericHost && url.encodedPath == "/" && url.query == null && url.fragment == null && url.username.isEmpty() && url.password.isEmpty())) {
-            "TrustTunnel TEST DNS supports IP or tcp://IP:port only; imported DNS was preserved."
+            "TrustTunnel DNS supports IP or tcp://IP:port only; imported DNS was preserved."
         }
     }
     return JSONObject().apply {

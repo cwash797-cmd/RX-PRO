@@ -39,7 +39,7 @@
                     <item
                         android:id="@+id/action_new_vless"
                         android:title="VLESS" />
-                    <item android:id="@+id/action_new_trusttunnel" android:title="TrustTunnel (TEST)" />
+                    <item android:id="@+id/action_new_trusttunnel" android:title="TrustTunnel" />
                     <item
                         android:id="@+id/action_new_xhttp"
                         android:title="@string/action_xhttp" />

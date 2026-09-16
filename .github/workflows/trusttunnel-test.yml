@@ -1,15 +1,16 @@
-name: TrustTunnel TEST arm64
+name: Android arm64 Build
 on:
   push:
-    branches: [feature/trusttunnel-test, fix/trusttunnel-reliability]
+    branches: [main, release/1.5.4]
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 concurrency:
-  group: trusttunnel-test-${{ github.ref }}
+  group: android-build-${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: false
 jobs:
-  test-apk:
+  build-apk:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -28,27 +29,24 @@ jobs:
           cache-dependency-path: |
             trusttunnel-core/go.sum
             libcore/go.sum
-      - name: Verify isolated TEST identity and fixed toolchain
+      - name: Verify identity and fixed Android toolchain
         run: |
-          grep -qx 'PACKAGE_NAME=com.rixxx.rxpro.tttest' nb4a.properties
-          grep -q 'VERSION_NAME=.*tt-test' nb4a.properties
-          # Hosted runner images rotate SDKs; provision ONLY the fixed versions
-          # on the ephemeral GitHub runner (the development sandbox is unchanged).
+          grep -qx 'PACKAGE_NAME=com.rixxx.rxpro' nb4a.properties
+          grep -Eq '^VERSION_NAME=[0-9]+\.[0-9]+\.[0-9]+$' nb4a.properties
+          # Provision fixed SDK versions on the ephemeral GitHub runner only.
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'ndk;27.0.12077973' 'build-tools;35.0.0' 'platforms;android-35'
-          test -d "$ANDROID_HOME/ndk/27.0.12077973"
-          test -d "$ANDROID_HOME/build-tools/35.0.0"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
-      - name: Protocol tests (synthetic credentials only)
+      - name: Protocol regression tests
         working-directory: trusttunnel-core
         run: go test -race -timeout 90s -v ./...
-      - name: Build unchanged pinned libcore
+      - name: Build pinned libcore
         run: ./run lib core
-      - name: Build TrustTunnel and fetch existing pinned plugins
+      - name: Build TrustTunnel and fetch pinned plugins
         run: |
           bash trusttunnel-core/build-android.sh
           bash buildScript/lib/plugins.sh
           bash buildScript/lib/assets.sh
-      - name: Test and build signed TEST APK
+      - name: Verify tests and build signed APK
         env:
           LOCAL_PROPERTIES: ${{ secrets.LOCAL_PROPERTIES }}
         run: |
@@ -58,18 +56,18 @@ jobs:
           APK=$(find app/build/outputs/apk/oss/release -name '*arm64-v8a*.apk' -print -quit)
           test -n "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "name='com.rixxx.rxpro'"
           unzip -l "$APK" | grep 'lib/arm64-v8a/libtrusttunnel.so'
           cp "$APK" test-dist/
           cd test-dist
           sha256sum *.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: RX-PRO-TrustTunnel-TEST-arm64
+          name: RX-PRO-arm64
           path: test-dist/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TrustTunnel-test-reports
+          name: Android-regression-reports
           path: app/build/reports/tests/
-# Intentionally no release publishing: stable 1.5.1 must remain Latest.

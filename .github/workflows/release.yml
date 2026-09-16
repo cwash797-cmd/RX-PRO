@@ -3,137 +3,43 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release Tag"
+        description: Version from nb4a.properties (for example 1.5.4)
         required: true
       publish:
-        description: "Publish: If want ignore"
-        required: false
-      play:
-        description: "Play: If want ignore"
-        required: false
+        description: Publish a new release after all checks pass
+        type: boolean
+        default: false
+permissions:
+  contents: read
 jobs:
-  libcore:
-    name: Native Build (LibCore)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Golang Status
-        run: find buildScript libcore/*.sh | xargs cat | sha1sum > golang_status
-      - name: Libcore Status
-        run: git ls-files libcore | xargs cat | sha1sum > libcore_status
-      - name: LibCore Cache
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            app/libs/libcore.aar
-          key: ${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
-      - name: Install Golang
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v5
-        with:
-          go-version: ^1.25
-      - name: Native Build
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: ./run lib core
   build:
-    name: Build OSS APK
-    runs-on: ubuntu-latest
-    needs:
-      - libcore
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Golang Status
-        run: find buildScript libcore/*.sh | xargs cat | sha1sum > golang_status
-      - name: Libcore Status
-        run: git ls-files libcore | xargs cat | sha1sum > libcore_status
-      - name: LibCore Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            app/libs/libcore.aar
-          key: ${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
-      - name: Gradle cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle
-          key: gradle-oss-${{ hashFiles('**/*.gradle.kts') }}
-      - name: Gradle Build
-        env:
-          BUILD_PLUGIN: none
-        run: |
-          echo "sdk.dir=${ANDROID_HOME}" > local.properties
-          echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
-          export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
-          ./run init action gradle
-          bash buildScript/lib/plugins.sh
-          ./gradlew app:assembleOssRelease
-          APK=$(find app/build/outputs/apk -name '*arm64-v8a*.apk')
-          APK=$(dirname $APK)
-          echo "APK=$APK" >> $GITHUB_ENV
-      - uses: actions/upload-artifact@v4
-        with:
-          name: APKs
-          path: ${{ env.APK }}
+    uses: ./.github/workflows/trusttunnel-test.yml
+    secrets: inherit
   publish:
-    name: Publish Release
-    if: github.event.inputs.publish != 'y'
-    runs-on: ubuntu-latest
+    if: ${{ inputs.publish }}
     needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Donwload Artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: APKs
+          name: RX-PRO-arm64
           path: artifacts
-      - name: Release
+      - name: Publish verified arm64 APK without overwriting releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          wget -O ghr.tar.gz https://github.com/tcnksm/ghr/releases/download/v0.13.0/ghr_v0.13.0_linux_amd64.tar.gz
-          tar -xvf ghr.tar.gz
-          mv ghr*linux_amd64/ghr .
-          mkdir apks
-          find artifacts -name "*.apk" -exec cp {} apks \;
-          ./ghr -delete -t "${{ github.token }}" -n "${{ github.event.inputs.tag }}" "${{ github.event.inputs.tag }}" apks
-  play:
-    name: Build Play Bundle
-    if: github.event.inputs.play != 'y'
-    runs-on: ubuntu-latest
-    needs:
-      - libcore
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Golang Status
-        run: find buildScript libcore/*.sh | xargs cat | sha1sum > golang_status
-      - name: Libcore Status
-        run: git ls-files libcore | xargs cat | sha1sum > libcore_status
-      - name: LibCore Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            app/libs/libcore.aar
-          key: ${{ hashFiles('.github/workflows/*', 'golang_status', 'libcore_status') }}
-      - name: Gradle cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle
-          key: gradle-play-${{ hashFiles('**/*.gradle.kts') }}
-      - name: Checkout Library
-        run: |
-          git submodule update --init 'app/*'
-      - name: Gradle Build
-        run: |
-          echo "sdk.dir=${ANDROID_HOME}" > local.properties
-          echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
-          export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
-          ./run init action gradle
-          bash buildScript/lib/plugins.sh
-          ./gradlew bundlePlayRelease
-      - uses: actions/upload-artifact@v4
-        with:
-          name: AAB
-          path: app/build/outputs/bundle/playRelease/app-play-release.aab
+          VERSION=$(sed -n 's/^VERSION_NAME=//p' nb4a.properties)
+          test "$RELEASE_TAG" = "$VERSION"
+          grep -qx 'PACKAGE_NAME=com.rixxx.rxpro' nb4a.properties
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to overwrite it.'
+            exit 1
+          fi
+          (cd artifacts && sha256sum -c SHA256SUMS.txt)
+          gh release create "$RELEASE_TAG" artifacts/*.apk artifacts/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --title "RX-PRO $RELEASE_TAG" \
+            --notes 'Android arm64. TrustTunnel HTTP/2 with embedded adapter, subscription import, profile editing and connection lifecycle fixes. See README for supported options. Signed APK and SHA256 checksums included.'
