@@ -1,7 +1,7 @@
 name: TrustTunnel TEST arm64
 on:
   push:
-    branches: [feature/trusttunnel-test]
+    branches: [feature/trusttunnel-test, fix/trusttunnel-reliability]
   workflow_dispatch:
 permissions:
   contents: read

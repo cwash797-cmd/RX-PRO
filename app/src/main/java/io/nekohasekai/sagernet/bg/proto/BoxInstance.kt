@@ -104,7 +104,7 @@ abstract class BoxInstance(
         loadConfig()
     }
 
-    override fun launch() {
+    override suspend fun launch() {
         // TODO move, this is not box
         val cacheDir = File(SagerNet.application.cacheDir, "tmpcfg")
         cacheDir.mkdirs()
@@ -205,20 +205,9 @@ abstract class BoxInstance(
                         }
                         processes.start(mutableListOf(initPlugin("trusttunnel-plugin").path, "--config", configFile.absolutePath),
                             mutableMapOf("RXPRO_CA_FILE" to caFile.absolutePath))
-                        // Wait for the loopback listener only. No upstream traffic before box.start().
-                        var ready = false
-                        val probe = Thread {
-                            val deadline = SystemClock.elapsedRealtime() + 5000
-                            while (!ready && SystemClock.elapsedRealtime() < deadline) {
-                                ready = runCatching {
-                                    java.net.Socket().use { it.connect(java.net.InetSocketAddress("127.0.0.1", port), 100) }
-                                }.onFailure { Logs.w("TrustTunnel probe: $it") }.isSuccess
-                                if (!ready) SystemClock.sleep(25)
-                            }
-                        }
-                        probe.start()
-                        probe.join(6000)
-                        if (!ready) Logs.w("TrustTunnel listener probe failed; continuing anyway")
+                        // Cancellable IO dispatcher probe; never block Main or continue on failure.
+                        io.nekohasekai.sagernet.fmt.trusttunnel.awaitTrustTunnelSocks(port)
+                        Logs.i("TrustTunnel local SOCKS5 handshake verified")
 
                     }
 

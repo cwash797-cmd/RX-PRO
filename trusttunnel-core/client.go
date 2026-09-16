@@ -39,12 +39,14 @@ type Config struct {
 }
 
 type Client struct {
-	cfg      Config
-	mu       sync.Mutex
-	conn     *http2.ClientConn
-	sessions []*http2.ClientConn
-	roots    *x509.CertPool
-	closed   bool
+	cfg            Config
+	mu             sync.Mutex
+	conn           *http2.ClientConn
+	sessions       []*http2.ClientConn
+	roots          *x509.CertPool
+	closed         bool
+	lifetime       context.Context
+	cancelLifetime context.CancelFunc
 }
 
 func newClient(cfg Config) (*Client, error) {
@@ -79,8 +81,38 @@ func newClient(cfg Config) (*Client, error) {
 	if _, err := randomBytes(cfg.ClientRandomPrefix); err != nil {
 		return nil, err
 	}
-	return &Client{cfg: cfg, roots: roots}, nil
+	lifetime, cancelLifetime := context.WithCancel(context.Background())
+	return &Client{cfg: cfg, roots: roots, lifetime: lifetime, cancelLifetime: cancelLifetime}, nil
 }
+
+// Never include err.Error(): TLS/network errors can contain endpoint identities.
+func tunnelStageError(stage string, err error) error {
+	kind := "transport"
+	var authority x509.UnknownAuthorityError
+	var hostname x509.HostnameError
+	var certificate x509.CertificateInvalidError
+	var network net.Error
+	switch {
+	case errors.Is(err, context.Canceled):
+		kind = "cancelled"
+	case errors.Is(err, context.DeadlineExceeded):
+		kind = "timeout"
+	case errors.As(err, &authority):
+		kind = "certificate-untrusted"
+	case errors.As(err, &hostname):
+		kind = "certificate-name-mismatch"
+	case errors.As(err, &certificate):
+		kind = "certificate-invalid-or-expired"
+	case errors.As(err, &network) && network.Timeout():
+		kind = "timeout"
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		kind = "peer-closed"
+	case errors.Is(err, net.ErrClosed):
+		kind = "connection-closed"
+	}
+	return fmt.Errorf("TrustTunnel %s failed [%s]", stage, kind)
+}
+
 func randomBytes(prefix string) ([]byte, error) {
 	data := make([]byte, 32)
 	if _, err := rand.Read(data); err != nil {
@@ -113,19 +145,29 @@ func randomBytes(prefix string) ([]byte, error) {
 	return data, nil
 }
 func (c *Client) session(ctx context.Context) (*http2.ClientConn, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(c.lifetime, cancel)
+	defer stop()
+	defer cancel()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {
 		return nil, errors.New("client stopped")
 	}
-	if c.conn != nil && c.conn.CanTakeNewRequest() {
-		return c.conn, nil
+	if c.conn != nil {
+		// CanTakeNewRequest intentionally returns true for a connection closed
+		// before its first stream. Without State checks this adapter reuses that
+		// failed session forever instead of establishing a fresh connection.
+		state := c.conn.State()
+		if !state.Closed && !state.Closing && c.conn.CanTakeNewRequest() {
+			return c.conn, nil
+		}
 	}
 	handshakeCtx, handshakeCancel := context.WithTimeout(ctx, 20*time.Second)
 	defer handshakeCancel()
 	raw, err := (&net.Dialer{Timeout: 20 * time.Second, KeepAlive: 20 * time.Second}).DialContext(handshakeCtx, "tcp", c.cfg.Server)
 	if err != nil {
-		return nil, errors.New("TrustTunnel upstream TCP unavailable")
+		return nil, tunnelStageError("upstream TCP", err)
 	}
 	fail := true
 	defer func() {
@@ -166,7 +208,7 @@ func (c *Client) session(ctx context.Context) (*http2.ClientConn, error) {
 		return nil, errors.New("TLS random configuration failed")
 	}
 	if err = conn.HandshakeContext(handshakeCtx); err != nil {
-		return nil, errors.New("TrustTunnel TLS handshake or certificate verification failed")
+		return nil, tunnelStageError("TLS", err)
 	}
 	if conn.ConnectionState().NegotiatedProtocol != "h2" {
 		return nil, errors.New("TrustTunnel requires ALPN h2")
@@ -259,7 +301,7 @@ func (c *Client) open(ctx context.Context, target, app string) (*stream, error) 
 		cancel()
 		reader.Close()
 		writer.Close()
-		return nil, errors.New("TrustTunnel CONNECT failed or timed out")
+		return nil, tunnelStageError("HTTP2 CONNECT", err)
 	}
 	if resp.StatusCode != 200 {
 		cancel()
@@ -275,6 +317,8 @@ func (c *Client) open(ctx context.Context, target, app string) (*stream, error) 
 	return &stream{reader: resp.Body, writer: writer, cancel: cancel}, nil
 }
 func (c *Client) Close() {
+	// Cancel a blocked dial/handshake before waiting on its session mutex.
+	c.cancelLifetime()
 	c.mu.Lock()
 	c.closed = true
 	sessions := append([]*http2.ClientConn(nil), c.sessions...)

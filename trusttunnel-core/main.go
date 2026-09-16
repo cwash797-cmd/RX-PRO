@@ -17,7 +17,7 @@ func main() {
 	version := flag.Bool("version", false, "show version")
 	flag.Parse()
 	if *version {
-		fmt.Println("RX-PRO TrustTunnel HTTP2 adapter 0.1-test")
+		fmt.Println("RX-PRO TrustTunnel HTTP2 adapter 0.2-test")
 		return
 	}
 	f, err := os.Open(*configPath)

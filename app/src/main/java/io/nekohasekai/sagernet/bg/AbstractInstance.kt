@@ -4,6 +4,6 @@ import java.io.Closeable
 
 interface AbstractInstance : Closeable {
 
-    fun launch()
+    suspend fun launch()
 
 }

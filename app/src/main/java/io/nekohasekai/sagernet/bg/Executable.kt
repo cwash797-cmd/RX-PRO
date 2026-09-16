@@ -12,7 +12,7 @@ object Executable {
     private val EXECUTABLES = setOf(
         "libtrojan.so", "libtrojan-go.so", "libnaive.so", "libtuic.so", "libhysteria.so",
         // RX-PRO: bundled plugin binaries
-        "libmieru.so", "libxray.so"
+        "libmieru.so", "libxray.so", "libtrusttunnel.so"
     )
 
     fun killAll(alsoKillBg: Boolean = false) {

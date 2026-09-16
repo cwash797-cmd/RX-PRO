@@ -356,7 +356,9 @@ class BaseService {
             }
 
             data.changeState(State.Connecting)
-            runOnMainDispatcher {
+            // Store the job before it can suspend, so Stop cancels startup instead
+            // of letting an old launch resume after the service has been closed.
+            val connectingJob = GlobalScope.launch(Dispatchers.Main.immediate, start = CoroutineStart.LAZY) {
                 try {
                     data.notification = createNotification(ServiceNotification.genTitle(profile))
 
@@ -396,6 +398,8 @@ class BaseService {
                     data.connectingJob = null
                 }
             }
+            data.connectingJob = connectingJob
+            connectingJob.start()
             return Service.START_NOT_STICKY
         }
     }

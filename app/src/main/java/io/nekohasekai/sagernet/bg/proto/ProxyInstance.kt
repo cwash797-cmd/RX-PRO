@@ -37,8 +37,12 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
     override suspend fun init() {
         super.init()
         pluginConfigs.forEach { (_, plugin) ->
-            val (_, content) = plugin
-            Logs.d(content)
+            val (type, content) = plugin
+            if (type == ProxyEntity.TYPE_TRUSTTUNNEL) {
+                Logs.d(io.nekohasekai.sagernet.fmt.trusttunnel.trustTunnelConfigLogMessage())
+            } else {
+                Logs.d(content)
+            }
         }
     }
 
@@ -46,7 +50,7 @@ class ProxyInstance(profile: ProxyEntity, var service: BaseService.Interface? = 
         super.loadConfig()
     }
 
-    override fun launch() {
+    override suspend fun launch() {
         box.setAsMain()
         super.launch() // start box
         runOnDefaultDispatcher {

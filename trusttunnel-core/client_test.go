@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/pem"
+	"errors"
 	"golang.org/x/net/http2"
 	"io"
 	"log"
@@ -54,6 +56,85 @@ func testEndpoint(t *testing.T) (*Client, *httptest.Server) {
 	t.Cleanup(c.Close)
 	return c, srv
 }
+func TestDiagnosticRedaction(t *testing.T) {
+	for _, err := range []error{errors.New("secret-password at private-endpoint.invalid"), x509.HostnameError{Certificate: &x509.Certificate{}, Host: "private-endpoint.invalid"}, context.DeadlineExceeded} {
+		message := tunnelStageError("TLS", err).Error()
+		if strings.Contains(message, "private-endpoint") || strings.Contains(message, "secret-password") {
+			t.Fatal("diagnostic leaked private data")
+		}
+	}
+	if !strings.Contains(tunnelStageError("TLS", context.DeadlineExceeded).Error(), "timeout") {
+		t.Fatal("timeout classification lost")
+	}
+	if !strings.Contains(tunnelStageError("TLS", x509.HostnameError{Certificate: &x509.Certificate{}, Host: "private-endpoint.invalid"}).Error(), "certificate-name-mismatch") {
+		t.Fatal("hostname error classification lost")
+	}
+}
+
+func TestCloseInterruptsStalledTLS(t *testing.T) {
+	listener, e := net.Listen("tcp", "127.0.0.1:0")
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer listener.Close()
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		conn, e := listener.Accept()
+		if e == nil {
+			accepted <- conn
+		}
+	}()
+	c, e := newClient(Config{Server: listener.Addr().String(), Hostname: "example.com", Username: "test-user", Password: "test-password"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { c.session(ctx); close(done) }()
+	var peer net.Conn
+	select {
+	case peer = <-accepted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("no connection")
+	}
+	defer peer.Close()
+	closed := make(chan struct{})
+	go func() { c.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(500 * time.Millisecond):
+		cancel()
+		<-closed
+		t.Fatal("Close blocked behind TLS handshake")
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("handshake survived Close")
+	}
+}
+
+func TestReconnectAfterClosedSession(t *testing.T) {
+	c, _ := testEndpoint(t)
+	first, e := c.session(context.Background())
+	if e != nil {
+		t.Fatal(e)
+	}
+	first.Close()
+	s, e := c.open(context.Background(), "example.net:443", "RX-PRO")
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	s.SetDeadline(time.Now().Add(2 * time.Second))
+	go func() { s.Write([]byte("reconnected")); s.CloseWrite() }()
+	got, e := io.ReadAll(s)
+	if e != nil || string(got) != "reconnected" {
+		t.Fatalf("reconnect failed: %v", e)
+	}
+}
+
 func TestHTTP2ConnectEchoAndMultiplex(t *testing.T) {
 	c, _ := testEndpoint(t)
 	for i := 0; i < 3; i++ {
