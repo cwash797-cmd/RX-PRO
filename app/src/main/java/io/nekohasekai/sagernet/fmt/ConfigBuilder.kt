@@ -123,6 +123,9 @@ fun buildConfig(
         return list
     }
 
+    if (!forTest && !forExport) {
+        io.nekohasekai.sagernet.database.ProfileManager.migrateLegacyRoutePresets()
+    }
     val extraRules = if (forTest) listOf() else SagerDatabase.rulesDao.enabledRules()
     val extraProxies =
         if (forTest) mapOf() else SagerDatabase.proxyDao.getEntities(extraRules.mapNotNull { rule ->

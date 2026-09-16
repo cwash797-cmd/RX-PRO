@@ -1,7 +1,7 @@
 name: Android arm64 Build
 on:
   push:
-    branches: [main, release/1.5.4]
+    branches: [main, release/1.5.5]
   workflow_dispatch:
   workflow_call:
 permissions:

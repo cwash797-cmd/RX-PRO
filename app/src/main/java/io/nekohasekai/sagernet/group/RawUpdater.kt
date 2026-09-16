@@ -10,6 +10,8 @@ import io.nekohasekai.sagernet.fmt.hysteria.parseHysteria1Json
 import io.nekohasekai.sagernet.fmt.mieru.MieruBean
 import io.nekohasekai.sagernet.fmt.naive.NaiveBean
 import io.nekohasekai.sagernet.fmt.xhttp.XhttpBean
+import io.nekohasekai.sagernet.fmt.xhttp.xhttpExtraFromTransport
+import io.nekohasekai.sagernet.fmt.xhttp.backfillXhttpExtra
 import io.nekohasekai.sagernet.fmt.shadowsocks.ShadowsocksBean
 import io.nekohasekai.sagernet.fmt.shadowsocks.parseShadowsocks
 import io.nekohasekai.sagernet.fmt.socks.SOCKSBean
@@ -758,7 +760,7 @@ object RawUpdater : GroupUpdater() {
         val stream = optJSONObject("streamSettings")
         val transport = optJSONObject("transport")
 
-        val network = stream?.getStr("network") ?: transport?.getStr("type")
+        val network = (stream?.getStr("network") ?: transport?.getStr("type"))?.lowercase()
         if (network != "xhttp" && network != "splithttp") return null
 
         val xhttpSettings = stream?.optJSONObject("xhttpSettings")
@@ -782,13 +784,17 @@ object RawUpdater : GroupUpdater() {
             xhttpSettings?.getStr("mode")?.let { mode = it }
             xhttpSettings?.getStr("path")?.let { path = it }
             xhttpSettings?.getStr("host")?.let { host = it }
-            xhttpSettings?.optJSONObject("extra")?.let { extraJson = it.toString() }
+            xhttpSettings?.let {
+                val extra = xhttpExtraFromTransport(it)
+                extraJson = if (extra.length() == 0) "" else extra.toString()
+                backfillXhttpExtra(extra)
+            }
             security = when {
                 realityObj != null -> "reality"
                 stream?.getStr("security") == "reality" -> "reality"
                 stream?.getStr("security") == "tls" -> "tls"
                 tlsObj?.optBoolean("enabled", false) == true -> "tls"
-                tlsObj != null -> "tls"
+                tlsObj != null && !tlsObj.has("enabled") -> "tls"
                 else -> "none"
             }
             realityObj?.let { r ->
@@ -834,7 +840,12 @@ object RawUpdater : GroupUpdater() {
                     return json.getJSONArray("outbounds")
                         .filterIsInstance<JSONObject>()
                         .mapNotNull {
-                            val ty = it.getStr("type")
+                            // Keep Xray XHTTP outbounds too; other Xray protocols
+                            // are not reinterpreted as sing-box raw configurations.
+                            val ty = it.getStr("type") ?: if (
+                                it.getStr("protocol") == "vless" &&
+                                it.optJSONObject("streamSettings")?.optString("network")?.lowercase() in setOf("xhttp", "splithttp")
+                            ) "vless" else null
                             if (ty == null || ty == "" ||
                                 ty == "dns" || ty == "block" || ty == "direct" || ty == "selector" || ty == "urltest"
                             ) {
@@ -845,7 +856,7 @@ object RawUpdater : GroupUpdater() {
                         }.map {
                             // RX-PRO: sing-box core has no naive/mieru outbound types —
                             // convert them to native plugin-backed profiles instead of raw configs.
-                            when (it.getStr("type")) {
+                            when (it.getStr("type") ?: it.getStr("protocol")) {
                                 "naive" -> NaiveBean().apply {
                                     proto = if (it.optBoolean("quic", false)) "quic" else "https"
                                     serverAddress = it.getStr("server")
@@ -889,6 +900,9 @@ object RawUpdater : GroupUpdater() {
                 }
 
                 json.has("server") && json.has("server_port") -> {
+                    if (json.getStr("type") == "vless") {
+                        json.parseXhttpOutbound()?.let { return listOf(it) }
+                    }
                     return listOf(ConfigBean().applyDefaultValues().apply {
                         type = 1
                         config = json.toStringPretty()

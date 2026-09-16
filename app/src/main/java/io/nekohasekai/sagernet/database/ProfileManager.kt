@@ -1,6 +1,8 @@
 package io.nekohasekai.sagernet.database
 
 import android.database.sqlite.SQLiteCantOpenDatabaseException
+import android.content.Context
+import android.content.res.Configuration
 import io.nekohasekai.sagernet.R
 import io.nekohasekai.sagernet.aidl.TrafficData
 import io.nekohasekai.sagernet.fmt.AbstractBean
@@ -181,7 +183,23 @@ object ProfileManager {
         }
     }
 
+    @Synchronized
+    fun migrateLegacyRoutePresets() {
+        val key = "routePresets155Migrated"
+        if (DataStore.configurationStore.getBoolean(key, false)) return
+        val templates = legacyRoutePresetChanges(app)
+        SagerDatabase.instance.runInTransaction {
+            for (rule in SagerDatabase.rulesDao.allRules()) {
+                val updated = migrateLegacyRoutePreset(rule, templates)
+                if (updated == null) SagerDatabase.rulesDao.deleteRule(rule)
+                else if (updated != rule) SagerDatabase.rulesDao.updateRule(updated)
+            }
+        }
+        DataStore.configurationStore.putBoolean(key, true)
+    }
+
     suspend fun getRules(): List<RuleEntity> {
+        migrateLegacyRoutePresets()
         var rules = SagerDatabase.rulesDao.allRules()
         if (rules.isEmpty() && !DataStore.rulesFirstCreate) {
             DataStore.rulesFirstCreate = true
@@ -200,40 +218,45 @@ object ProfileManager {
                     outbound = -2
                 )
             )
-            val fuckedCountry = mutableListOf("cn:中国")
-            if (Locale.getDefault().country != Locale.CHINA.country) {
-                // 非中文用户
-                fuckedCountry += "ir:Iran"
-                fuckedCountry += "ru:Russia"
-            }
-            for (c in fuckedCountry) {
-                val country = c.substringBefore(":")
-                val displayCountry = c.substringAfter(":")
-                //
-                if (country == "cn") createRule(
-                    RuleEntity(
-                        name = app.getString(R.string.route_play_store, displayCountry),
-                        domains = "googleapis.cn",
-                    ), false
-                )
-                createRule(
-                    RuleEntity(
-                        name = app.getString(R.string.route_bypass_domain, displayCountry),
-                        domains = "geosite:$country",
-                        outbound = -1
-                    ), false
-                )
-                createRule(
-                    RuleEntity(
-                        name = app.getString(R.string.route_bypass_ip, displayCountry),
-                        ip = "geoip:$country",
-                        outbound = -1
-                    ), false
-                )
-            }
+            for (rule in ruRoutePresets()) createRule(rule, false)
             rules = SagerDatabase.rulesDao.allRules()
         }
         return rules
     }
 
+}
+
+// Play Store matching and outbound are deliberately unchanged; only its name changes.
+fun ruRoutePresets() = listOf(
+    RuleEntity(name = "для RU", domains = "googleapis.cn"),
+    RuleEntity(name = "Домены RU — напрямую", domains = "geosite:category-ru", outbound = -1),
+    RuleEntity(name = "IP RU — напрямую", ip = "geoip:ru", outbound = -1)
+)
+
+fun legacyRoutePresetChanges(context: Context): List<Pair<RuleEntity, RuleEntity?>> {
+    val presets = ruRoutePresets()
+    // Match old localized names even when the application language has changed.
+    val locales = (context.assets.locales.toList() + listOf("en", "ru", "zh-CN", "fa")).distinct()
+    return locales.flatMap { tag ->
+        val config = Configuration(context.resources.configuration).apply {
+            setLocale(Locale.forLanguageTag(tag.replace('_', '-')))
+        }
+        val localized = context.createConfigurationContext(config)
+        buildList {
+            add(RuleEntity(name = localized.getString(R.string.route_play_store, "中国"), domains = "googleapis.cn") to presets[0])
+            for ((code, country) in listOf("cn" to "中国", "ir" to "Iran", "ru" to "Russia")) {
+                add(RuleEntity(name = localized.getString(R.string.route_bypass_domain, country), domains = "geosite:$code", outbound = -1) to if (code == "ru") presets[1] else null)
+                add(RuleEntity(name = localized.getString(R.string.route_bypass_ip, country), ip = "geoip:$code", outbound = -1) to if (code == "ru") presets[2] else null)
+            }
+        }
+    }.distinct()
+}
+
+fun migrateLegacyRoutePreset(rule: RuleEntity, templates: List<Pair<RuleEntity, RuleEntity?>>): RuleEntity? {
+    // No heuristic deletion: require the complete original name and match/action fields.
+    // Preserve renamed/extended user rules, identifiers, order and enabled state.
+    val original = rule.copy(id = 0, userOrder = 0, enabled = false)
+    val match = templates.firstOrNull { it.first == original } ?: return rule
+    val replacement = match.second ?: return null
+    return rule.copy(name = replacement.name, domains = replacement.domains, ip = replacement.ip)
 }

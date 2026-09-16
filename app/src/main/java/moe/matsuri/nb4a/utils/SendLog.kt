@@ -41,8 +41,13 @@ object SendLog {
             logFile.appendText("Export logcat error: " + CrashHandler.formatThrowable(e))
         }
 
-        logFile.appendText("\n")
-        logFile.appendBytes(getNekoLog(0))
+        logFile.appendText("\nCore / plugin log:\n\n")
+        val coreLog = getNekoLog(0)
+        if (coreLog.isEmpty()) {
+            logFile.appendText("Core log is empty. Enable logging in Settings, restart RX-PRO, reproduce the failure and export again. Review addresses and credentials before sharing.\n")
+        } else {
+            logFile.appendBytes(coreLog)
+        }
 
         context.startActivity(
             Intent.createChooser(

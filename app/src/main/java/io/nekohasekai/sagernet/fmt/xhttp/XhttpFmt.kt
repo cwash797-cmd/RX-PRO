@@ -17,15 +17,75 @@ import io.nekohasekai.sagernet.ktx.toLink
 import io.nekohasekai.sagernet.ktx.toStringPretty
 import io.nekohasekai.sagernet.ktx.urlSafe
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okio.ByteString.Companion.decodeBase64
 import org.json.JSONArray
 import org.json.JSONObject
+
+// Normalize only transport and xmux keys, never arbitrary nested TLS/header data.
+private val xhttpKeys = mapOf(
+    "x_padding_bytes" to "xPaddingBytes", "no_grpc_header" to "noGRPCHeader",
+    "no_sse_header" to "noSSEHeader",
+    "sc_max_each_post_bytes" to "scMaxEachPostBytes",
+    "sc_min_posts_interval_ms" to "scMinPostsIntervalMs",
+    "sc_max_buffered_posts" to "scMaxBufferedPosts",
+    "sc_stream_up_server_secs" to "scStreamUpServerSecs",
+    "download_settings" to "downloadSettings"
+)
+private val xmuxKeys = mapOf(
+    "max_concurrency" to "maxConcurrency", "max_connections" to "maxConnections",
+    "c_max_reuse_times" to "cMaxReuseTimes", "h_max_request_times" to "hMaxRequestTimes",
+    "h_max_reusable_secs" to "hMaxReusableSecs", "h_keep_alive_period" to "hKeepAlivePeriod"
+)
+
+private fun JSONObject.renameKeys(aliases: Map<String, String>): JSONObject = apply {
+    for ((snake, camel) in aliases) if (has(snake)) {
+        // Match panel 1.11.4's explicit snake_case precedence.
+        put(camel, remove(snake))
+    }
+}
+
+fun decodeXhttpExtra(raw: String): JSONObject {
+    if (raw.isBlank()) return JSONObject()
+    val text = raw.trim()
+    fun parse(value: String): JSONObject? = runCatching { JSONObject(value) }.getOrNull()
+    val decoded = android.net.Uri.decode(text)
+    val obj = parse(text) ?: parse(decoded)
+        ?: decoded.decodeBase64()?.utf8()?.let { parse(it) }
+        ?: throw IllegalArgumentException("Invalid XHTTP extra: expected JSON or Base64 JSON")
+    obj.renameKeys(xhttpKeys)
+    obj.optJSONObject("xmux")?.renameKeys(xmuxKeys)
+    return obj
+}
+
+// Capture flattened Xray/sing-box transport options as well as nested extra.
+// Xray replaces the outer advanced options when extra exists, so nested wins.
+fun xhttpExtraFromTransport(settings: JSONObject): JSONObject {
+    val flat = JSONObject()
+    val excluded = setOf("type", "mode", "path", "host", "extra")
+    settings.keys().forEach { key ->
+        if (key !in excluded) flat.put(key, settings.get(key))
+    }
+    val result = decodeXhttpExtra(flat.toString())
+    if (settings.has("extra") && !settings.isNull("extra")) {
+        val nested = decodeXhttpExtra(settings.get("extra").toString())
+        nested.keys().forEach { result.put(it, nested.get(it)) }
+    }
+    return result
+}
+
+fun XhttpBean.backfillXhttpExtra(extra: JSONObject) {
+    // Only omitted fields inherit; explicit auto and / are meaningful settings.
+    if (mode.isNullOrBlank()) extra.optString("mode").takeIf { it.isNotBlank() }?.let { mode = it }
+    if (path.isNullOrBlank()) extra.optString("path").takeIf { it.isNotBlank() }?.let { path = it }
+    if (host.isNullOrBlank()) extra.optString("host").takeIf { it.isNotBlank() }?.let { host = it }
+}
 
 // vless://UUID@host:port?type=xhttp&mode=packet-up&path=/...&host=...&security=tls
 //   &sni=...&fp=chrome&alpn=h2,http/1.1&allowInsecure=1&extra=%7B...%7D#name
 // REALITY variant (v1.5.0): …&security=reality&pbk=<publicKey>&sid=<shortId>&spx=<spiderX>
 fun parseXhttp(link: String): XhttpBean {
     val url = ("https://" + link.substringAfter("://")).toHttpUrlOrNull()
-        ?: error("Invalid xhttp link: $link")
+        ?: throw IllegalArgumentException("Invalid XHTTP link")
     return XhttpBean().apply {
         serverAddress = url.host
         serverPort = url.port
@@ -52,24 +112,10 @@ fun parseXhttp(link: String): XhttpBean {
         if (!realityPublicKey.isNullOrBlank() && security != "reality") security = "reality"
         // HttpUrl already percent-decodes the fragment
         name = url.fragment ?: ""
-        // RX-PRO v1.5.1: some links carry mode/path/host ONLY inside the "extra"
-        // JSON. Xray's SplitHTTPConfig.Build() UNCONDITIONALLY overwrites
-        // extra.mode/path/host with the outer values — even when they're blank —
-        // so a blank outer mode would silently reset e.g. "packet-up" to "auto"
-        // and break servers that require a specific mode. Backfill from extra.
         if (!extraJson.isNullOrBlank()) {
-            runCatching {
-                val extra = JSONObject(extraJson)
-                if (mode.isNullOrBlank() || mode == "auto") {
-                    extra.optString("mode").takeIf { it.isNotBlank() }?.let { mode = it }
-                }
-                if (path.isNullOrBlank() || path == "/") {
-                    extra.optString("path").takeIf { it.isNotBlank() }?.let { path = it }
-                }
-                if (host.isNullOrBlank()) {
-                    extra.optString("host").takeIf { it.isNotBlank() }?.let { host = it }
-                }
-            }
+            val extra = decodeXhttpExtra(extraJson)
+            extraJson = extra.toString()
+            backfillXhttpExtra(extra)
         }
         initializeDefaultValues()
     }
@@ -106,13 +152,13 @@ fun XhttpBean.toUri(): String {
 // finalAddress/finalPort to that mapping. Xray therefore only ever talks to
 // localhost and the real upstream socket is opened by sing-box through the
 // protected fd — no traffic re-enters the tunnel.
-fun XhttpBean.buildXrayConfig(port: Int): String {
+fun XhttpBean.buildXrayConfig(port: Int, logLevel: Int = DataStore.logLevel): String {
     // RX-PRO v1.5.1: Xray's SplitHTTPConfig.Build() replaces the whole config
     // with "extra" when present, then FORCE-overwrites extra's mode/path/host
     // with the OUTER values — even blank ones. So the outer fields must always
     // carry the effective values or they'd wipe out what's inside extra.
     val extraObj: JSONObject? =
-        if (extraJson.isNotBlank()) runCatching { JSONObject(extraJson) }.getOrNull() else null
+        if (extraJson.isNotBlank()) decodeXhttpExtra(extraJson) else null
     val effectiveMode = mode.ifBlank { extraObj?.optString("mode")?.ifBlank { null } ?: "auto" }
     val effectivePath = path.ifBlank { extraObj?.optString("path") ?: "" }
     val effectiveHost = host.ifBlank {
@@ -159,7 +205,7 @@ fun XhttpBean.buildXrayConfig(port: Int): String {
 
     return JSONObject().apply {
         put("log", JSONObject().apply {
-            put("loglevel", if (DataStore.logLevel > 0) "debug" else "warning")
+            put("loglevel", if (logLevel > 0) "debug" else "warning")
         })
         put("inbounds", JSONArray().apply {
             put(JSONObject().apply {

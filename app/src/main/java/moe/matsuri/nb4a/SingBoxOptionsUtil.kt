@@ -87,7 +87,9 @@ fun generateRuleSet(ruleSetString: List<String>, ruleSet: MutableList<RuleSet>) 
                     type = "local"
                     tag = it
                     format = "binary"
-                    path = it
+                    // Legacy ru rules (including user-created ones) keep their tag,
+                    // but load the actual category in the bundled SagerNet database.
+                    path = if (it == "geosite:ru") "geosite:category-ru" else it
                 })
             }
         }
