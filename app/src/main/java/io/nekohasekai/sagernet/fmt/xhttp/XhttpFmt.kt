@@ -159,6 +159,12 @@ fun XhttpBean.buildXrayConfig(port: Int, logLevel: Int = DataStore.logLevel): St
     // carry the effective values or they'd wipe out what's inside extra.
     val extraObj: JSONObject? =
         if (extraJson.isNotBlank()) decodeXhttpExtra(extraJson) else null
+    // A separate download stream has its own Destination in Xray and would
+    // bypass the single protected sing-box mapping. Preserve it for export,
+    // but fail closed until a second protected mapping is implemented.
+    require(extraObj == null || !extraObj.has("downloadSettings") || extraObj.isNull("downloadSettings")) {
+        "XHTTP downloadSettings requires a separate protected endpoint; this mode is not supported"
+    }
     val effectiveMode = mode.ifBlank { extraObj?.optString("mode")?.ifBlank { null } ?: "auto" }
     val effectivePath = path.ifBlank { extraObj?.optString("path") ?: "" }
     val effectiveHost = host.ifBlank {

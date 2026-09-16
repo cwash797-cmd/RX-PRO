@@ -85,6 +85,13 @@ class XhttpRegressionTest {
         assertEquals("none", b.security)
         assertEquals("100-200", JSONObject(b.extraJson).getString("xPaddingBytes"))
     }
+    @Test fun separateDownloadEndpointIsPreservedButCannotBypassVpnProtection() {
+        val b = parseXhttp(base + "&extra=" + encoded("""{"downloadSettings":{"address":"download.example.com","port":443}}"""))
+        assertEquals("download.example.com", JSONObject(parseXhttp(b.toUri()).extraJson).getJSONObject("downloadSettings").getString("address"))
+        val error = assertThrows(IllegalArgumentException::class.java) { b.buildXrayConfig(25080, 0) }
+        assertFalse(error.message.orEmpty().contains("download.example.com"))
+        assertTrue(error.message.orEmpty().contains("protected endpoint"))
+    }
     @Test fun nativeLoopbackFixtureUsesProductionBuilder() {
         val b = parseXhttp(base + "&extra=" + encoded(knobs))
         b.security = "none"
