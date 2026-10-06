@@ -4,7 +4,8 @@ set -e
 source "buildScript/init/env.sh"
 ENV_NB4A=1
 source "buildScript/lib/core/get_source_env.sh"
-pushd ..
+mkdir -p .lab/sources
+pushd .lab/sources
 
 ####
 

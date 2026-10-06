@@ -207,7 +207,7 @@ data class ProxyEntity(
         TYPE_TUIC -> "TUIC"
         TYPE_SHADOWTLS -> "ShadowTLS"
         TYPE_ANYTLS -> "AnyTLS"
-        TYPE_XHTTP -> "VLESS-XHTTP"
+        TYPE_XHTTP -> if (!xhttpBean?.s3Json.isNullOrBlank()) "VLESS-S3" else "VLESS-XHTTP"
         TYPE_TRUSTTUNNEL -> "TrustTunnel"
         TYPE_CHAIN -> chainName
         TYPE_NEKO -> nekoBean!!.displayType()

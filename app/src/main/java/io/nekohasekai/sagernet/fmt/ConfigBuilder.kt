@@ -23,6 +23,9 @@ import io.nekohasekai.sagernet.fmt.v2ray.StandardV2RayBean
 import io.nekohasekai.sagernet.fmt.v2ray.buildSingBoxOutboundStandardV2RayBean
 import io.nekohasekai.sagernet.fmt.wireguard.WireGuardBean
 import io.nekohasekai.sagernet.fmt.wireguard.buildSingBoxOutboundWireguardBean
+import io.nekohasekai.sagernet.fmt.xhttp.XhttpBean
+import io.nekohasekai.sagernet.fmt.xhttp.isS3
+import io.nekohasekai.sagernet.fmt.xhttp.applyS3Policy
 import io.nekohasekai.sagernet.ktx.isIpAddress
 import io.nekohasekai.sagernet.ktx.mkPort
 import io.nekohasekai.sagernet.utils.PackageCache
@@ -82,6 +85,14 @@ fun buildConfig(
     val globalOutbounds = HashMap<Long, String>()
     val selectorNames = ArrayList<String>()
     val group = SagerDatabase.groupDao.getById(proxy.groupId)
+    val s3Profile = (proxy.requireBean() as? XhttpBean)?.takeIf { it.isS3 }
+    if (s3Profile != null) {
+        require(group?.isSelector != true) { "S3 beta requires a single profile, not a selector group" }
+        require(!DataStore.proxyApps && !DataStore.bypassLan) { "S3 beta requires full VPN: disable per-app and LAN bypass" }
+        for (custom in listOf(DataStore.globalCustomConfig, s3Profile.customConfigJson, s3Profile.customOutboundJson)) {
+            require(custom.isNullOrBlank() || custom.trim() == "{}") { "Custom JSON is not supported in strict S3 mode" }
+        }
+    }
 
     fun ProxyEntity.resolveChainInternal(): MutableList<ProxyEntity> {
         val bean = requireBean()
@@ -126,7 +137,7 @@ fun buildConfig(
     if (!forTest && !forExport) {
         io.nekohasekai.sagernet.database.ProfileManager.migrateLegacyRoutePresets()
     }
-    val extraRules = if (forTest) listOf() else SagerDatabase.rulesDao.enabledRules()
+    val extraRules = if (forTest || s3Profile != null) listOf() else SagerDatabase.rulesDao.enabledRules()
     val extraProxies =
         if (forTest) mapOf() else SagerDatabase.proxyDao.getEntities(extraRules.mapNotNull { rule ->
             rule.outbound.takeIf { it > 0 && it != proxy.id }
@@ -137,9 +148,9 @@ fun buildConfig(
     val bypassDNSBeans = hashSetOf<AbstractBean>()
     val isVPN = DataStore.serviceMode == Key.MODE_VPN
     val bind = if (!forTest && DataStore.allowAccess) "0.0.0.0" else LOCALHOST
-    val remoteDns = DataStore.remoteDns.split("\n")
+    val remoteDns = (if (s3Profile != null) "https://1.1.1.1/dns-query" else DataStore.remoteDns).split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
-    val directDNS = DataStore.directDns.split("\n")
+    val directDNS = (if (s3Profile != null) "https://1.1.1.1/dns-query" else DataStore.directDns).split("\n")
         .mapNotNull { dns -> dns.trim().takeIf { it.isNotBlank() && !it.startsWith("#") } }
     val enableDnsRouting = DataStore.enableDnsRouting
     val useFakeDns = DataStore.enableFakeDns && !forTest
@@ -274,6 +285,11 @@ fun buildConfig(
 
             profileList.forEachIndexed { index, proxyEntity ->
                 val bean = proxyEntity.requireBean()
+                if (bean is XhttpBean && bean.isS3) {
+                    require(s3Profile != null && profileList.size == 1 && chainId == 0L) {
+                        "S3 beta cannot be used in chains, selectors or additional routing outbounds"
+                    }
+                }
 
                 // tagOut: v2ray outbound tag for a profile
                 // profile2 (in) (global)   tag g-(id)
@@ -741,7 +757,9 @@ fun buildConfig(
             }
         }
 
-        if (!forTest) _hack_custom_config = DataStore.globalCustomConfig
+        if (s3Profile != null) {
+            applyS3Policy(this, s3Profile, forTest)
+        } else if (!forTest) _hack_custom_config = DataStore.globalCustomConfig
     }.let {
         val configMap = it.asMap()
         Util.mergeJSON(configMap, proxy.requireBean().customConfigJson)

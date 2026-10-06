@@ -26,6 +26,10 @@ object PluginManager {
     @Throws(Throwable::class)
     fun init(pluginId: String): InitResult? {
         if (pluginId.isEmpty()) return null
+        if (pluginId == "s3xray-plugin") {
+            val path = initNativeInternal(pluginId) ?: throw PluginNotFoundException(pluginId)
+            return InitResult(path, ProviderInfo())
+        }
         var throwable: Throwable? = null
 
         try {
@@ -78,6 +82,7 @@ object PluginManager {
             "naive-plugin" -> soIfExist("libnaive.so")
             // RX-PRO: Xray-core, the only core implementing XHTTP transport
             "xray-plugin" -> soIfExist("libxray.so")
+            "s3xray-plugin" -> soIfExist("libs3xray.so")
             "trusttunnel-plugin" -> soIfExist("libtrusttunnel.so")
             else -> null
         }

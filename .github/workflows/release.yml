@@ -42,4 +42,4 @@ jobs:
           (cd artifacts && sha256sum -c SHA256SUMS.txt)
           gh release create "$RELEASE_TAG" artifacts/*.apk artifacts/SHA256SUMS.txt \
             --target "$GITHUB_SHA" --title "RX-PRO $RELEASE_TAG" \
-            --notes 'Android arm64. TrustTunnel HTTP/2 with embedded adapter, subscription import, profile editing and connection lifecycle fixes. See README for supported options. Signed APK and SHA256 checksums included.'
+            --notes 'RX-PRO 1.6.0: VLESS-S3 integrated alongside existing protocols. Main package com.rixxx.rxpro, versionCode 75, release signature verified against 1.5.5. Existing S3 server and links remain compatible. See README and docs/s3-start.md for strict S3 routing and bootstrap limits. APK and SHA256 included.'

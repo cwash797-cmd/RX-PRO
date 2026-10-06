@@ -1,28 +1,13 @@
-#!/bin/bash
-
-chmod -R 777 .build 2>/dev/null
-rm -rf .build 2>/dev/null
-
-if [ -z "$GOPATH" ]; then
-    GOPATH=$(go env GOPATH)
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd .. && pwd)"
+: "${GOPATH:?Set a workspace-local GOPATH}"
+SOURCE="$ROOT/.lab/sources/gomobile"
+if [ ! -d "$SOURCE/.git" ]; then
+  git clone --no-checkout https://github.com/MatsuriDayo/gomobile.git "$SOURCE"
 fi
-
-# Install gomobile
-if [ ! -f "$GOPATH/bin/gomobile-matsuri" ]; then
-    git clone https://github.com/MatsuriDayo/gomobile.git
-    pushd gomobile
-	git checkout origin/master2
-    pushd cmd
-    pushd gomobile
-    go install -v
-    popd
-    pushd gobind
-    go install -v
-    popd
-    popd
-    rm -rf gomobile
-    mv "$GOPATH/bin/gomobile" "$GOPATH/bin/gomobile-matsuri"
-    mv "$GOPATH/bin/gobind" "$GOPATH/bin/gobind-matsuri"
-fi
-
-GOBIND=gobind-matsuri gomobile-matsuri init
+git -C "$SOURCE" checkout 17d6af34f6bd6d7e1e428e0c652c8b54a46bda4f
+(cd "$SOURCE" && go build -o "$GOPATH/bin/gomobile-matsuri" ./cmd/gomobile && go build -o "$GOPATH/bin/gobind-matsuri" ./cmd/gobind)
+# Both tools were built from the pinned fork above. Its init command fetches
+# an unrelated moving gobind@latest; bind only needs this cache directory.
+mkdir -p "$GOPATH/pkg/gomobile"

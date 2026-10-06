@@ -24,6 +24,9 @@ import io.nekohasekai.sagernet.fmt.KryoConverters;
 public class XhttpBean extends AbstractBean {
 
     public String uuid;
+    // Version 2: optional native S3 profile; old XHTTP records remain readable.
+    public String s3Json;
+    public String vlessEncryption;
     // xhttp transport
     public String mode;      // auto / packet-up / stream-up / stream-one
     public String path;
@@ -42,9 +45,16 @@ public class XhttpBean extends AbstractBean {
     public String realitySpiderX;
 
     @Override
+    public String displayName() {
+        return s3Json != null && !s3Json.isEmpty() ? S3FmtKt.safeS3Name(name) : super.displayName();
+    }
+
+    @Override
     public void initializeDefaultValues() {
         super.initializeDefaultValues();
         if (uuid == null) uuid = "";
+        if (s3Json == null) s3Json = "";
+        if (vlessEncryption == null) vlessEncryption = "";
         if (mode == null) mode = "auto";
         if (path == null) path = "/";
         if (host == null) host = "";
@@ -61,7 +71,7 @@ public class XhttpBean extends AbstractBean {
 
     @Override
     public void serialize(ByteBufferOutput output) {
-        output.writeInt(1);
+        output.writeInt(2);
         super.serialize(output);
         output.writeString(uuid);
         output.writeString(mode);
@@ -77,6 +87,8 @@ public class XhttpBean extends AbstractBean {
         output.writeString(realityPublicKey);
         output.writeString(realityShortId);
         output.writeString(realitySpiderX);
+        output.writeString(s3Json);
+        output.writeString(vlessEncryption);
     }
 
     @Override
@@ -97,6 +109,10 @@ public class XhttpBean extends AbstractBean {
             realityPublicKey = input.readString();
             realityShortId = input.readString();
             realitySpiderX = input.readString();
+        }
+        if (version >= 2) {
+            s3Json = input.readString();
+            vlessEncryption = input.readString();
         }
     }
 

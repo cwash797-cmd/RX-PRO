@@ -35,6 +35,8 @@ android {
         jniLibs {
             useLegacyPackaging = true
             keepDebugSymbols += "**/libtrusttunnel.so"
+            // This is a pinned executable, not a JNI library. Keep it byte-identical.
+            keepDebugSymbols += "**/libs3xray.so"
         }
     }
     androidResources {

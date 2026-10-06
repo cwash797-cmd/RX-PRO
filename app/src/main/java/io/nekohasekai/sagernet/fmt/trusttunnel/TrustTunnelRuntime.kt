@@ -14,7 +14,10 @@ import java.net.Socket
 import java.net.SocketTimeoutException
 
 /** Loopback only: no CONNECT request and no upstream traffic before sing-box starts. */
-suspend fun awaitTrustTunnelSocks(port: Int, timeoutMillis: Long = 5000) = withContext(Dispatchers.IO) {
+suspend fun awaitTrustTunnelSocks(port: Int, timeoutMillis: Long = 5000) =
+    awaitLocalSocks(port, timeoutMillis, "TrustTunnel")
+
+suspend fun awaitLocalSocks(port: Int, timeoutMillis: Long = 5000, adapter: String = "S3") = withContext(Dispatchers.IO) {
     require(port in 1..65535 && timeoutMillis > 0)
     val deadline = System.nanoTime() + timeoutMillis * 1_000_000
     var reason = "not-listening"
@@ -43,7 +46,7 @@ suspend fun awaitTrustTunnelSocks(port: Int, timeoutMillis: Long = 5000) = withC
         currentCoroutineContext().ensureActive()
         delay(25)
     }
-    throw IOException("TrustTunnel local SOCKS5 not ready [$reason]. Check adapter startup logs.")
+    throw IOException("$adapter local SOCKS5 not ready [$reason]. Check adapter startup logs.")
 }
 
 fun trustTunnelConfigLogMessage(): String = "TrustTunnel configuration prepared (credentials hidden)"

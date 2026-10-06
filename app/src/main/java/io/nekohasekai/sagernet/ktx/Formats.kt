@@ -190,7 +190,10 @@ suspend fun parseProxies(text: String): List<AbstractBean> {
         } else if (startsWith("vless://")) {
             // RX-PRO: sing-box has no XHTTP transport — VLESS XHTTP links become
             // native Xray-core backed profiles instead of broken sing-box outbounds.
-            if (isXhttpLink(this)) {
+            if (io.nekohasekai.sagernet.fmt.xhttp.isS3Link(this)) {
+                runCatching { entities.add(io.nekohasekai.sagernet.fmt.xhttp.parseS3(this)) }
+                    .onFailure { Logs.w("Invalid S3 profile (credentials hidden)") }
+            } else if (isXhttpLink(this)) {
                 Logs.d("Try parse vless xhttp link (credentials hidden)")
                 runCatching {
                     entities.add(parseXhttp(this))
