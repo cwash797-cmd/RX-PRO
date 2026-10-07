@@ -20,6 +20,7 @@ import io.nekohasekai.sagernet.fmt.trojan_go.TrojanGoBean
 import io.nekohasekai.sagernet.fmt.trojan_go.buildTrojanGoConfig
 import io.nekohasekai.sagernet.fmt.xhttp.XhttpBean
 import io.nekohasekai.sagernet.fmt.xhttp.buildXrayConfig
+import io.nekohasekai.sagernet.fmt.xhttp.isS3
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.plugin.PluginManager
 import kotlinx.coroutines.*
@@ -83,7 +84,8 @@ abstract class BoxInstance(
                     }
 
                     is XhttpBean -> {
-                        initPlugin("xray-plugin")
+                        check(!bean.isS3 || android.os.Build.SUPPORTED_ABIS.contains("arm64-v8a")) { "S3 requires arm64-v8a" }
+                        initPlugin(if (bean.isS3) "s3xray-plugin" else "xray-plugin")
                         pluginConfigs[port] = profile.type to bean.buildXrayConfig(port)
                     }
 
@@ -217,18 +219,43 @@ abstract class BoxInstance(
                         )
 
                         configFile.parentFile?.mkdirs()
+                        configFile.createNewFile()
+                        android.system.Os.chmod(configFile.absolutePath, 384) // 0600, before secrets
                         configFile.writeText(config)
                         cacheFiles.add(configFile)
 
                         val envMap = mutableMapOf<String, String>()
+                        if (bean.isS3) {
+                            envMap["GOMEMLIMIT"] = "96MiB"
+                            envMap["GOMAXPROCS"] = "2"
+                            val caFile = File.createTempFile("s3_ca_", ".pem", cacheDir)
+                            android.system.Os.chmod(caFile.absolutePath, 384)
+                            cacheFiles.add(caFile)
+                            val trust = java.security.KeyStore.getInstance("AndroidCAStore").apply { load(null) }
+                            caFile.bufferedWriter().use { output ->
+                                val aliases = trust.aliases()
+                                while (aliases.hasMoreElements()) {
+                                    val cert = trust.getCertificate(aliases.nextElement()) ?: continue
+                                    output.appendLine("-----BEGIN CERTIFICATE-----")
+                                    output.appendLine(android.util.Base64.encodeToString(cert.encoded, android.util.Base64.NO_WRAP).chunked(64).joinToString("\n"))
+                                    output.appendLine("-----END CERTIFICATE-----")
+                                }
+                            }
+                            envMap["SSL_CERT_FILE"] = caFile.absolutePath
+                        }
                         // Xray reads its config from this env var when run with "run"
                         envMap["XRAY_LOCATION_ASSET"] = SagerNet.application.noBackupFilesDir.absolutePath
 
                         val commands = mutableListOf(
-                            initPlugin("xray-plugin").path, "run", "-c", configFile.absolutePath
+                            initPlugin(if (bean.isS3) "s3xray-plugin" else "xray-plugin").path, "run", "-c", configFile.absolutePath
                         )
 
                         processes.start(commands, envMap)
+                        if (bean.isS3) {
+                            // Greeting only: VK mapping starts with sing-box below.
+                            io.nekohasekai.sagernet.fmt.trusttunnel.awaitLocalSocks(port)
+                            Logs.i("S3 local SOCKS5 ready; VK-only mapping, tunneled DNS, bootstrap snapshot 2026-10-05")
+                        }
                     }
 
                     bean is HysteriaBean -> {

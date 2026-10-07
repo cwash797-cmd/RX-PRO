@@ -25,6 +25,18 @@ class XhttpSettingsActivity : ProfileSettingsActivity<XhttpBean>() {
 
     override fun createEntity() = XhttpBean().applyDefaultValues()
 
+    private var s3Profile = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        s3Profile = savedInstanceState?.getBoolean("s3Profile") ?: false
+        super.onCreate(savedInstanceState)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("s3Profile", s3Profile)
+        super.onSaveInstanceState(outState)
+    }
+
     private val pbm = PreferenceBindingManager()
     private val name = pbm.add(PreferenceBinding(Type.Text, "name"))
     private val serverAddress = pbm.add(PreferenceBinding(Type.Text, "serverAddress"))
@@ -46,6 +58,7 @@ class XhttpSettingsActivity : ProfileSettingsActivity<XhttpBean>() {
     private val realitySpiderX = pbm.add(PreferenceBinding(Type.Text, "realitySpiderX"))
 
     override fun XhttpBean.init() {
+        s3Profile = !s3Json.isNullOrBlank()
         pbm.writeToCacheAll(this)
     }
 
@@ -58,6 +71,17 @@ class XhttpSettingsActivity : ProfileSettingsActivity<XhttpBean>() {
         rootKey: String?,
     ) {
         addPreferencesFromResource(R.xml.xhttp_preferences)
+        if (s3Profile) {
+            for (i in 0 until preferenceScreen.preferenceCount) {
+                val pref = preferenceScreen.getPreference(i)
+                if (pref.key != "name") pref.isVisible = false
+            }
+            preferenceScreen.addPreference(androidx.preference.Preference(requireContext()).apply {
+                title = "VLESS over VK S3"
+                summary = "Imported secure profile. To change credentials, import a new link from the administrator."
+                isSelectable = false
+            })
+        }
 
         findPreference<EditTextPreference>(Key.SERVER_PORT)!!.apply {
             setOnBindEditTextListener(EditTextPreferenceModifiers.Port)

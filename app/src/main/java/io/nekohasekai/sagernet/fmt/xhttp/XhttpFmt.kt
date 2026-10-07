@@ -122,6 +122,7 @@ fun parseXhttp(link: String): XhttpBean {
 }
 
 fun XhttpBean.toUri(): String {
+    if (isS3) return toS3Uri()
     val builder = linkBuilder().host(serverAddress).port(serverPort)
     if (uuid.isNotBlank()) builder.username(uuid)
     builder.addQueryParameter("type", "xhttp")
@@ -153,6 +154,7 @@ fun XhttpBean.toUri(): String {
 // localhost and the real upstream socket is opened by sing-box through the
 // protected fd — no traffic re-enters the tunnel.
 fun XhttpBean.buildXrayConfig(port: Int, logLevel: Int = DataStore.logLevel): String {
+    if (isS3) return buildS3Config(port)
     // RX-PRO v1.5.1: Xray's SplitHTTPConfig.Build() replaces the whole config
     // with "extra" when present, then FORCE-overwrites extra's mode/path/host
     // with the OUTER values — even blank ones. So the outer fields must always

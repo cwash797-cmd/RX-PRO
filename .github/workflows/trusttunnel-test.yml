@@ -1,21 +1,85 @@
 name: Android arm64 Build
+
 on:
   push:
-    branches: [main, release/1.5.5]
+    branches: [main, genspark_ai_developer]
   workflow_dispatch:
   workflow_call:
+
 permissions:
   contents: read
+
 concurrency:
-  group: android-build-${{ github.ref }}-${{ github.workflow }}
-  cancel-in-progress: false
+  group: rxpro-build-${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
-  build-apk:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      GOMAXPROCS: '2'
+      GOFLAGS: '-p=2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - name: Generator and native race tests
+        run: |
+          python3 -m unittest discover -s tools -p 'test_*.py' -v
+          python3 s3-core/build.py test
+      - name: Build pinned S3 executables
+        run: |
+          python3 s3-core/build.py linux
+          python3 s3-core/build.py android
+      - name: Verify local TLS and SigV4 bridge against stock VLESS
+        run: |
+          curl --fail --location --retry 3 -o .lab/xray-stock.zip https://github.com/XTLS/Xray-core/releases/download/v26.9.30/Xray-linux-64.zip
+          echo 'f851110beaff16e78d643f0ccfd9524b4a44dfd59bae3e34bb52bba378f7690e  .lab/xray-stock.zip' | sha256sum -c -
+          unzip -j .lab/xray-stock.zip xray -d .lab
+          chmod +x .lab/xray
+          python3 tools/integration_s3.py
+      - name: Package server without credentials
+        run: |
+          mkdir -p test-dist/server
+          install -m 755 .lab/bin/xray-s3 tools/s3_profile.py tools/install-server.sh test-dist/server/
+          install -m 644 docs/s3-start.md test-dist/server/START.md
+          install -m 644 LICENSE test-dist/server/CLIENT-LICENSE
+          install -m 644 .lab/xray-src/LICENSE test-dist/server/XRAY-LICENSE
+          install -m 644 .lab/gopath/pkg/mod/github.com/aws/aws-sdk-go-v2@v1.36.3/LICENSE.txt test-dist/server/AWS-LICENSE
+          tar -czf test-dist/s3_rixxx_server_linux_amd64_1.6.0.tar.gz -C test-dist/server .
+          cd test-dist
+          sha256sum *.tar.gz > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: S3-native-arm64
+          path: app/executableSo/arm64-v8a/libs3xray.so
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: S3-server-linux-amd64
+          path: |
+            test-dist/*.tar.gz
+            test-dist/SHA256SUMS.txt
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: S3-local-integration-report
+          path: .lab/s3-integration/results.json
+          include-hidden-files: true
+          if-no-files-found: error
+
+  android:
+    needs: native
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       GOMAXPROCS: '2'
       GOFLAGS: '-p=2'
+      GOPATH: ${{ github.workspace }}/.lab/gopath
+      GOCACHE: ${{ github.workspace }}/.lab/go-cache
       nkmr_minify: '0'
     steps:
       - uses: actions/checkout@v4
@@ -29,35 +93,71 @@ jobs:
           cache-dependency-path: |
             trusttunnel-core/go.sum
             libcore/go.sum
-      - name: Verify identity and fixed Android toolchain
+      - name: Verify identity and install pinned SDK
         run: |
           grep -qx 'PACKAGE_NAME=com.rixxx.rxpro' nb4a.properties
-          grep -Eq '^VERSION_NAME=[0-9]+\.[0-9]+\.[0-9]+$' nb4a.properties
-          # Provision fixed SDK versions on the ephemeral GitHub runner only.
+          grep -qx 'VERSION_NAME=1.6.0' nb4a.properties
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'ndk;27.0.12077973' 'build-tools;35.0.0' 'platforms;android-35'
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
-      - name: Protocol regression tests
+          mkdir -p "$GOPATH/bin" "$GOCACHE" libcore/.build
+          echo "$GOPATH/bin" >> "$GITHUB_PATH"
+      - name: TrustTunnel regression tests
         working-directory: trusttunnel-core
-        run: go test -race -timeout 90s -v ./...
-      - name: Build pinned libcore
-        run: ./run lib core
-      - name: Build TrustTunnel and fetch pinned plugins
+        run: go test -race -timeout 90s ./...
+      - name: Build native stack and fetch pinned assets
         run: |
+          ./run lib core
           bash trusttunnel-core/build-android.sh
           bash buildScript/lib/plugins.sh
           bash buildScript/lib/assets.sh
-      - name: Verify tests and build signed APK
+      - uses: actions/download-artifact@v4
+        with:
+          name: S3-native-arm64
+          path: app/executableSo/arm64-v8a
+      - name: JVM regression tests and signed release APK
         env:
           LOCAL_PROPERTIES: ${{ secrets.LOCAL_PROPERTIES }}
         run: |
           test -n "$LOCAL_PROPERTIES"
+          chmod +x app/executableSo/arm64-v8a/libs3xray.so
           ./gradlew :app:testOssDebugUnitTest :app:assembleOssRelease --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -XX:ActiveProcessorCount=2' -Pkotlin.compiler.execution.strategy=in-process --console=plain
-          mkdir -p test-dist
+      - name: Validate S3 routing fixtures with the pinned native core
+        run: |
+          mkdir -p .lab/bin
+          (cd .lab/sources/sing-box && go build -mod=readonly -tags 'with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api' -o "$GITHUB_WORKSPACE/.lab/bin/sing-box-policy" ./cmd/sing-box)
+          python3 - <<'PYTHON'
+          import pathlib, subprocess, time
+          for config in pathlib.Path('app/build').glob('s3-policy-*.json'):
+              checked = subprocess.run(['.lab/bin/sing-box-policy', 'check', '-c', str(config)], capture_output=True, text=True)
+              assert checked.returncode == 0 and 'FATAL' not in checked.stderr, checked.stderr
+              with pathlib.Path('.lab/policy-startup.log').open('w+') as log:
+                  process = subprocess.Popen(['.lab/bin/sing-box-policy', 'run', '-c', str(config)], stdout=log, stderr=log)
+                  try:
+                      time.sleep(1)
+                      log.flush(); log.seek(0)
+                      assert process.poll() is None, log.read()
+                  finally:
+                      process.terminate(); process.wait(timeout=10)
+          PYTHON
+      - name: Verify APK identity, signature and embedded cores
+        run: |
           APK=$(find app/build/outputs/apk/oss/release -name '*arm64-v8a*.apk' -print -quit)
           test -n "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "name='com.rixxx.rxpro'"
-          unzip -l "$APK" | grep 'lib/arm64-v8a/libtrusttunnel.so'
+          for core in libgojni libs3xray libxray libtrusttunnel libmieru libnaive; do
+            unzip -l "$APK" | grep "lib/arm64-v8a/$core.so"
+          done
+          unzip -p "$APK" lib/arm64-v8a/libs3xray.so | cmp - app/executableSo/arm64-v8a/libs3xray.so
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" > .lab/release-badging.txt
+          grep "versionCode='75' versionName='1.6.0'" .lab/release-badging.txt
+          if grep -q '^application-debuggable' .lab/release-badging.txt; then exit 1; fi
+          curl --fail --location --retry 3 -o .lab/rxpro-1.5.5.apk https://github.com/cwash797-cmd/RX-PRO/releases/download/1.5.5/RX-PRO-1.5.5-arm64-v8a.apk
+          echo 'ff4cde7c6b08110709df31359f9c5ccf243dc30567565242435ff6924517f435  .lab/rxpro-1.5.5.apk' | sha256sum -c -
+          OLD_CERT=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs .lab/rxpro-1.5.5.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          NEW_CERT=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          test -n "$OLD_CERT" && test "$OLD_CERT" = "$NEW_CERT"
+          mkdir -p test-dist
           cp "$APK" test-dist/
           cd test-dist
           sha256sum *.apk > SHA256SUMS.txt
@@ -70,4 +170,6 @@ jobs:
         if: always()
         with:
           name: Android-regression-reports
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/

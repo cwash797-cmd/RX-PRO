@@ -22,3 +22,7 @@ jniLibs/
 /libcore/gomobile/
 /app/*-build.log
 /test-dist/
+
+.lab/
+__pycache__/
+release.keystore

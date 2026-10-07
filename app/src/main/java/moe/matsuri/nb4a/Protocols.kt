@@ -21,7 +21,8 @@ object Protocols {
             if (bean is ConfigBean) {
                 return bean.config
             }
-            if (bean is io.nekohasekai.sagernet.fmt.trusttunnel.TrustTunnelBean) {
+            if (bean is io.nekohasekai.sagernet.fmt.trusttunnel.TrustTunnelBean ||
+                (bean is io.nekohasekai.sagernet.fmt.xhttp.XhttpBean && !bean.s3Json.isNullOrBlank())) {
                 // Same endpoint may contain separate accounts or TLS settings.
                 val normalized = bean.clone().apply { name = "" }
                 val bytes = io.nekohasekai.sagernet.fmt.KryoConverters.serialize(normalized)

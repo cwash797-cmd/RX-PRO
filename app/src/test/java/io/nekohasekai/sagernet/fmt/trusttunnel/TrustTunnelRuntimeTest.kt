@@ -30,7 +30,7 @@ class TrustTunnelRuntimeTest {
     }
     @Test fun closedPortIsNotSuccess() = runBlocking {
         val port = listener().use { it.localPort }
-        try { awaitTrustTunnelSocks(port, 150); fail("accepted closed port") }
+        try { awaitLocalSocks(port, 150); fail("accepted closed port") }
         catch (e: IOException) { assertTrue(e.message!!.contains("not-listening")) }
     }
     @Test fun acceptsNoPlainTcpOrHttpListener() = runBlocking {
@@ -41,7 +41,7 @@ class TrustTunnelRuntimeTest {
                     catch (_: IOException) { break }
                 }
             }
-            try { awaitTrustTunnelSocks(server.localPort, 200); fail("accepted HTTP listener") }
+            try { awaitLocalSocks(server.localPort, 200); fail("accepted HTTP listener") }
             catch (e: IOException) { assertTrue(e.message!!.contains("local SOCKS5 not ready")) }
             finally { server.close(); worker.join(1000) }
         }
@@ -50,7 +50,7 @@ class TrustTunnelRuntimeTest {
         listener().use { server ->
             // Backlog accepts TCP, but no peer ever answers SOCKS negotiation.
             var completed = false
-            val job = launch { awaitTrustTunnelSocks(server.localPort, 5000); completed = true }
+            val job = launch { awaitLocalSocks(server.localPort, 5000); completed = true }
             delay(50)
             val start = System.nanoTime()
             job.cancelAndJoin()
@@ -64,7 +64,7 @@ class TrustTunnelRuntimeTest {
         newSingleThreadContext("simulated-ui").use { ui ->
             listener().use { server ->
                 val callerThread = withContext(ui) { Thread.currentThread() }
-                val job = launch(ui) { awaitTrustTunnelSocks(server.localPort, 5000) }
+                val job = launch(ui) { awaitLocalSocks(server.localPort, 5000) }
                 try {
                     delay(30)
                     withTimeout(1000) { withContext(ui) { assertSame(callerThread, Thread.currentThread()) } }
@@ -75,4 +75,28 @@ class TrustTunnelRuntimeTest {
     @Test fun startupLogHasNoConfiguration() {
         assertEquals("TrustTunnel configuration prepared (credentials hidden)", trustTunnelConfigLogMessage())
     }
+    @Test fun s3WaitsForDelayedGreetingWithoutOpeningUpstream() = runBlocking {
+        listener().use { server ->
+            val failure = java.util.concurrent.atomic.AtomicReference<Throwable>()
+            val worker = thread {
+                try {
+                    server.accept().use { socket ->
+                        val greeting = ByteArray(3)
+                        java.io.DataInputStream(socket.getInputStream()).readFully(greeting)
+                        assertArrayEquals(byteArrayOf(5, 1, 0), greeting)
+                        Thread.sleep(30)
+                        socket.getOutputStream().write(byteArrayOf(5, 0))
+                        socket.soTimeout = 1000
+                        assertEquals(-1, socket.getInputStream().read()) // no SOCKS CONNECT
+                    }
+                } catch (e: Throwable) { failure.set(e) }
+            }
+            awaitLocalSocks(server.localPort, 1500)
+            worker.join(2000)
+            assertFalse(worker.isAlive)
+            failure.get()?.let { throw AssertionError(it) }
+            Unit
+        }
+    }
+
 }
