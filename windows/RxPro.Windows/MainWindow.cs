@@ -40,7 +40,7 @@ public sealed class MainWindow : Window
         var root = new DockPanel { Margin = new Thickness(28) }; Content = root;
         var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 22) };
         heading.Children.Add(new TextBlock { Text = "RX-PRO", FontSize = 32, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(24, 51, 83)) });
-        heading.Children.Add(new TextBlock { Text = "WINDOWS  /  S3  /  0.1.0-rc1", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 5, 0, 0) });
+        heading.Children.Add(new TextBlock { Text = "WINDOWS  /  S3  /  0.1.0", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 5, 0, 0) });
         DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
         var footer = new TextBlock { Text = "Прокси-режим, не TUN. Программы, игнорирующие прокси, могут выходить напрямую.\nПрофили защищены учётной записью Windows. Не отправляйте ссылки и ключи в поддержку.", TextWrapping = TextWrapping.Wrap,
             Foreground = Brushes.SlateGray, FontSize = 12, Margin = new Thickness(0, 22, 0, 0) };
