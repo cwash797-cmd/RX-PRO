@@ -9,7 +9,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'windows/artifacts'
 APP = OUT / 'app'
-VERSION = '0.1.0-rc1'
+VERSION = '0.1.0'
 
 
 def main():

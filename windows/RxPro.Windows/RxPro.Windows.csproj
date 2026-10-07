@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>RX-PRO Windows</AssemblyName><Version>0.1.0</Version><InformationalVersion>0.1.0-rc1</InformationalVersion>
+    <AssemblyName>RX-PRO Windows</AssemblyName><Version>0.1.0</Version><InformationalVersion>0.1.0</InformationalVersion>
     <StartupObject>RxPro.Windows.Program</StartupObject><ApplicationManifest>app.manifest</ApplicationManifest>
     <CoreDirectory Condition="'$(CoreDirectory)' == ''">../../.lab/windows-native/bin</CoreDirectory>
   </PropertyGroup>
