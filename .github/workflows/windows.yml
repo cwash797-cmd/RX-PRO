@@ -1,0 +1,79 @@
+name: Windows S3 portable
+on:
+  push:
+    branches: [main, genspark_ai_developer]
+    paths: ['windows/**', 's3-core/**', '.github/workflows/windows.yml', 'docs/windows.md']
+  pull_request:
+    paths: ['windows/**', 's3-core/**', '.github/workflows/windows.yml', 'docs/windows.md']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - run: python3 windows/build_core.py test
+      - run: python3 windows/build_core.py windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-native
+          path: .lab/windows-native/bin/*
+          if-no-files-found: error
+  desktop:
+    needs: core
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.401'
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-native
+          path: .lab/windows-native/bin
+      - name: Build and Windows regression tests
+        shell: pwsh
+        run: |
+          dotnet run --project windows/RxPro.Tests -c Release -- .lab/windows-native/bin/xray-s3.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish self-contained portable application
+        shell: pwsh
+        run: |
+          dotnet publish windows/RxPro.Windows -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -o windows/artifacts/app
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item windows/artifacts/app/core -ItemType Directory -Force | Out-Null
+          Copy-Item .lab/windows-native/bin/xray-s3.exe windows/artifacts/app/core/
+          Copy-Item .lab/windows-native/bin/*LICENSE windows/artifacts/app/
+          Copy-Item README.md windows/artifacts/app/README.txt
+          $root = Split-Path (Get-Command dotnet).Source
+          Copy-Item "$root/LICENSE.txt" windows/artifacts/app/DOTNET-LICENSE.txt
+          Copy-Item "$root/ThirdPartyNotices.txt" windows/artifacts/app/DOTNET-THIRD-PARTY-NOTICES.txt
+      - name: Packaged executable and transport checks
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          python -u windows/integration.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python windows/package.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $before = Get-Content windows/artifacts/SHA256SUMS.txt -Raw
+          python windows/package.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($before -ne (Get-Content windows/artifacts/SHA256SUMS.txt -Raw)) { throw "Repeated packaging changed the release archive" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RX-PRO-Windows-x64
+          path: |
+            windows/artifacts/*.zip
+            windows/artifacts/SHA256SUMS.txt
+          if-no-files-found: error
